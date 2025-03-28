@@ -1,0 +1,112 @@
+debug: false # Enable debug logging
+
+# LLM provider configuration
+llm_provider: "bedrock" # Change from "bedrock" to "ollama"
+
+ollama:
+  base_url: "http://localhost:11434"
+  max_tokens: 4096
+  retries: 3
+  retry_delay: 1.0
+  timeout: 30
+  concurrency: 1 # Default to sequential processing (no parallelism)
+  temperature: 0.1 # Add temperature setting
+
+bedrock:
+  region: us-east-1
+  model_id: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  max_tokens: 8192
+  timeout: 180 # Increase timeout to 3 minutes
+  retries: 5 # Increase retry count
+  concurrency: 10
+  verify_ssl: false # Set to false to disable SSL verification for corporate proxies
+  temperature: 0.1 # Add temperature setting
+
+cache:
+  enabled: true # Set to false to disable caching
+  directory: ".cache" # Directory to store cache files
+  location: "home" # Where to store the cache: "repo" (in target repository) or "home" (in user's home directory)
+  hash_algorithm: "md5" # Hash algorithm to use for file content hashing (md5, sha1, or sha256)
+  global_directory: "readme_generator_cache" # Directory name for global cache when location is "home" (removed dot to make it visible)
+
+# Processing options
+optimize_order: false # Set to true to use LLM for determining optimal file processing order
+preserve_existing: true # Set to true to preserve and enhance existing README/docs instead of replacing them
+
+templates:
+  prompts:
+    file_summary: |
+      Analyze the following code file and provide a clear, concise summary:
+      File: {file_path}
+      Type: {file_type}
+      Context: {context}
+
+      Code:
+      {code}
+
+    project_overview: |
+      Generate a comprehensive overview for:
+      Project: {project_name}
+      Files: {file_count}
+      Components: {key_components}
+
+    enhance_existing: |
+      You are enhancing an existing {doc_type} file. 
+
+      EXISTING CONTENT:
+      {existing_content}
+
+      REPOSITORY ANALYSIS:
+      {analysis}
+
+      Your task is to create the best possible documentation by intelligently combining the existing content with new insights from the repository analysis.
+
+      Guidelines:
+      1. Preserve valuable information from the existing content, especially specific implementation details, configuration examples, and custom instructions.
+      2. Feel free to reorganize the document structure to improve clarity and flow.
+      3. Remove outdated, redundant, or incorrect information.
+      4. Add missing information and technical details based on the repository analysis.
+      5. Ensure proper markdown formatting with consistent header hierarchy.
+      6. Maintain code snippets and examples, updating them only if they're incorrect.
+      7. If the existing content has a specific tone or style, try to maintain it.
+
+      Return a completely restructured document that represents the best possible documentation for this codebase, combining the strengths of the existing content with new insights.
+
+  docs:
+    readme: |
+      # {project_name}
+
+      {project_overview}
+
+      ## Documentation
+
+      {usage}
+
+      ## Development
+
+      {contributing}
+
+      ## License
+
+      {license}
+
+test_mode: false # Limits analysis to first 5 files for testing
+
+blacklist:
+  extensions: [".txt", ".log"] # Remove .md from blacklisted extensions
+  path_patterns:
+    - "/temp/"
+    - "/cache/"
+    - "/node_modules/"
+    - "/__pycache__/"
+    - "/wwwroot/"
+    - "^aql/"
+    - "aql/"
+    - "/aql/"
+    # - "CHANGELOG.md" # Still exclude some specific markdown files
+    # - "LICENSE.md"
+    # Pattern to exclude large C++ files that might cause regex memory issues
+    - ".*\\.cpp$"
+    - ".*\\.cc$"
+    - ".*\\.h$"
+    - ".*\\.hpp$"

@@ -1,0 +1,12 @@
+gitignore-parser>=0.1.11
+networkx>=3.2.1
+python-magic>=0.4.27
+pyyaml>=6.0.1
+ollama>=0.4.7
+tqdm>=4.66.1
+textstat>=0.7.3
+httpx>=0.26.0
+typing-extensions>=4.9.0
+boto3>=1.28.0
+python-dotenv>=1.0.0
+PyGithub>=2.1.1
