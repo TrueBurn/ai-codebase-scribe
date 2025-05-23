@@ -14,7 +14,7 @@ ollama:
 
 bedrock:
   region: us-east-1
-  model_id: us.anthropic.claude-3-7-sonnet-20250219-v1:0
+  model_id: us.anthropic.claude-sonnet-4-20250514-v1:0
   max_tokens: 8192
   timeout: 180 # Increase timeout to 3 minutes
   retries: 5 # Increase retry count

@@ -241,7 +241,7 @@ The `BedrockClient` is a concrete implementation of `BaseLLMClient` that interac
 ```python
 # Constants for default configuration values
 DEFAULT_REGION = 'us-east-1'
-DEFAULT_MODEL_ID = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
+DEFAULT_MODEL_ID = 'us.anthropic.claude-sonnet-4-20250514-v1:0'
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TIMEOUT = 120
 DEFAULT_RETRIES = 3
@@ -688,7 +688,7 @@ config = {
     'llm_provider': 'bedrock',
     'bedrock': {
         'region': 'us-east-1',
-        'model_id': 'us.anthropic.claude-3-7-sonnet-20250219-v1:0',
+        'model_id': 'us.anthropic.claude-sonnet-4-20250514-v1:0',
         'max_tokens': 4096,
         'timeout': 120,
         'retries': 3,

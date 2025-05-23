@@ -300,7 +300,7 @@ class BedrockClient(BaseLLMClient):
         
         # Constants for default configuration values
         DEFAULT_REGION = 'us-east-1'
-        DEFAULT_MODEL_ID = 'us.anthropic.claude-3-7-sonnet-20250219-v1:0'
+        DEFAULT_MODEL_ID = 'us.anthropic.claude-sonnet-4-20250514-v1:0'
         DEFAULT_MAX_TOKENS = 4096
         DEFAULT_TIMEOUT = 120
         
