@@ -25,63 +25,207 @@ python codebase_scribe.py --repo ./my-project --config custom_config.yaml
 
 ## Configuration Schema
 
-The configuration file uses a YAML format with the following structure:
+The configuration file uses YAML format. All sections are optional; unspecified keys fall back to their defaults.
+
+### Top-Level Options
 
 ```yaml
-# LLM provider configuration
-llm_provider: "ollama"  # or "bedrock"
-debug: false  # Enable debug logging
+llm_provider: "bedrock"  # "bedrock" or "ollama"
+debug: false             # Enable verbose debug logging
+test_mode: false         # Limit analysis to first 5 files (quick validation)
+optimize_order: false    # Use LLM to determine optimal file processing order
+preserve_existing: true  # Enhance existing docs instead of replacing them
+exit_on_docs_only_changes: true  # Exit early when only documentation files changed
+```
 
-# Ollama-specific configuration
+### Ollama
+
+```yaml
 ollama:
   base_url: "http://localhost:11434"
   max_tokens: 4096
   retries: 3
   retry_delay: 1.0
   timeout: 30
-  concurrency: 1  # Number of concurrent requests
-  temperature: 0.0  # 0.0 = deterministic output
+  concurrency: 1      # Number of concurrent requests (default 1 = sequential)
+  temperature: 0.1    # Generation temperature (0.0 = deterministic)
+```
 
-# AWS Bedrock-specific configuration
+### AWS Bedrock
+
+```yaml
 bedrock:
   region: "us-east-1"
-  model_id: "us.anthropic.claude-3-5-sonnet-20241022-v2:0"
+  model_id: "us.anthropic.claude-sonnet-4-20250514-v1:0"
   max_tokens: 8192
-  retries: 3
-  retry_delay: 1.0
-  timeout: 120  # Default to 2 minutes
-  verify_ssl: true
-  concurrency: 5  # Default to moderate concurrency
-  temperature: 0.0  # Default to deterministic output
+  timeout: 180          # Request timeout in seconds
+  retries: 5
+  concurrency: 10
+  verify_ssl: true      # Set false to bypass SSL for corporate proxies
+  temperature: 0.1
 
-# Cache configuration
+  # Throttling fallback
+  # When a ThrottlingException is received, the client automatically retries
+  # using fallback_model_id (typically a smaller, less constrained model).
+  fallback_model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  enable_fallback: true
+  throttling_retry_delay: 30.0   # Seconds to wait before fallback attempt
+  throttling_max_retries: 5      # Maximum fallback retry attempts
+
+  # Per-task output token limits
+  # Override max_tokens for specific generation tasks that require longer output.
+  max_output_tokens_architecture: 32768
+  max_output_tokens_persistence: 32768
+
+  # AWS Bedrock prompt caching
+  # Caches stable portions of large prompts (project structure, tech report, etc.)
+  # to reduce input token costs and latency on repeated calls.
+  enable_prompt_caching: true
+  cache_min_tokens: 1024         # Minimum token count for a component to be cached
+  cache_ttl_minutes: 5           # Cache time-to-live in minutes
+  cache_strategy: "balanced"     # "conservative" | "balanced" | "aggressive"
+                                 # conservative: cache_min_tokens * 2
+                                 # balanced:     cache_min_tokens
+                                 # aggressive:   cache_min_tokens / 2
+
+  # Extended context (1M token window via Bedrock beta header)
+  extended_context_enabled: true
+  extended_context_beta_header: "context-1m-2025-08-07"
+```
+
+### Cache (File Cache)
+
+This is the local file-level cache used to avoid re-summarising unchanged source files. It is separate from the AWS Bedrock prompt cache.
+
+```yaml
 cache:
   enabled: true
   directory: ".cache"
-  location: "home"  # "repo" or "home"
+  location: "home"       # "repo" (inside target repo) or "home" (user home dir)
   hash_algorithm: "md5"  # "md5", "sha1", or "sha256"
-  global_directory: ".readme_generator_cache"  # Used when location is "home"
+  global_directory: "readme_generator_cache"  # Directory name when location="home"
+```
 
-# Processing options
-optimize_order: false
-preserve_existing: true
-no_cache: false
-test_mode: false
+### Processing Options
 
-# File filtering
+```yaml
+optimize_order: false    # Use LLM to determine optimal file processing order
+preserve_existing: true  # Enhance existing docs instead of replacing them
+test_mode: false         # Limit analysis to the first 5 non-ignored files
+exit_on_docs_only_changes: true  # Skip generation when only docs files changed
+```
+
+### Large Repository Handling
+
+When a repository's file count exceeds `threshold`, large-repo mode activates automatically. This enables batch processing and smart sampling to keep runs within time and memory limits.
+
+```yaml
+large_repo:
+  threshold: 450              # File count that triggers large-repo mode
+  max_files: 1000             # Hard cap on files processed per run
+  collapsible_tree: true      # Use collapsible HTML tree in architecture doc
+  enhanced_sampling: true     # Use smart sampling across the codebase
+  files_per_component: 10     # Files sampled per detected component
+  smart_prioritization: true  # Prioritize high-signal files
+  verbose_logging: true       # Extra progress detail in large-repo mode
+  batch_processing: true      # Process in batches and persist cache between batches
+  time_limit_minutes: 45      # Abort and cache results after this many minutes
+  cache_only_mode: true       # Only update cache; do not write documentation
+  skip_docs_on_partial: true  # Skip doc generation on incomplete batch runs
+  create_pr_on_batch: false   # Create a PR after each batch (requires GitHub token)
+  batch_pr_branch: "batch-processing/cache-update"
+```
+
+### Persistence Layer Documentation
+
+Detects and documents database migration and ORM frameworks in the analyzed repository.
+
+```yaml
+persistence:
+  enabled: true
+  generate_doc: true
+  output_file: "docs/PERSISTENCE.md"
+  detection_threshold: 0.2    # Confidence threshold (0.0–1.0) for technology detection
+  supported_technologies:
+    flyway: true
+    efcore: true
+    prisma: true
+    hibernate: true
+    django: true
+    rails: true
+    sequelize: true
+    alembic: true
+```
+
+### Installation Guide
+
+Generates a step-by-step installation guide based on the detected language, package manager, and dependency files.
+
+```yaml
+installation:
+  enabled: true
+  output_file: "docs/INSTALLATION.md"
+```
+
+### Usage Guide
+
+Generates a CLI and API usage guide based on entry points and examples discovered in the codebase.
+
+```yaml
+usage:
+  enabled: true
+  output_file: "docs/USAGE.md"
+```
+
+### Troubleshooting Guide
+
+Generates a common issues and resolutions guide based on error handling patterns and documentation found in the codebase.
+
+```yaml
+troubleshooting:
+  enabled: true
+  output_file: "docs/TROUBLESHOOTING.md"
+```
+
+### Contributing Guide
+
+Generates contributor guidelines based on code style, test patterns, and existing CONTRIBUTING content.
+
+```yaml
+contributing:
+  enabled: true
+  output_file: "CONTRIBUTING.md"
+```
+
+### README Refactoring
+
+After generating separate documentation files, the refactor step replaces the corresponding sections in `README.md` with brief overviews and links, keeping the README focused and navigable.
+
+```yaml
+readme_refactor:
+  enabled: true
+  keep_brief_overview: true    # Retain the first 2–3 lines of each migrated section
+  add_navigation_section: true # Add or update a "Documentation" nav section
+```
+
+### File Filtering
+
+```yaml
 blacklist:
-  extensions: [".txt", ".log"]
-  path_patterns:
+  extensions: [".txt", ".log"]   # File extensions to exclude from analysis
+  path_patterns:                 # Regex patterns for paths to exclude
     - "/temp/"
     - "/cache/"
     - "/node_modules/"
     - "/__pycache__/"
     - "/wwwroot/"
-    - "^aql/"
-    - "aql/"
-    - "/aql/"
+```
 
-# Templates for prompts and documentation
+### Templates
+
+Prompt and documentation templates can be overridden in `config.yaml`. See the default `config.yaml` for the full set of available template keys.
+
+```yaml
 templates:
   prompts:
     file_summary: |
@@ -92,7 +236,6 @@ templates:
 
       Code:
       {code}
-    # Other prompt templates...
   docs:
     readme: |
       # {project_name}
@@ -110,7 +253,6 @@ templates:
       ## License
 
       {license}
-    # Other documentation templates...
 ```
 
 ## Environment Variables

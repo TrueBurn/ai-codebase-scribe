@@ -1,9 +1,3 @@
-> **⚠️ WORK IN PROGRESS ⚠️**
-> 
-> This project is under active development and is **NOT** production-ready.
-> Breaking changes are likely to occur without prior notice.
-> Use at your own risk in non-production environments only.
-
 # CodeBase Scribe AI
 
 A Python tool that generates comprehensive project documentation using AI models. It analyzes your codebase, generates documentation, validates links, checks readability, and ensures high-quality output with flexible AI provider options.
@@ -26,48 +20,69 @@ For detailed technical documentation and architecture information, see:
 
 ## Features
 
-- 🔍 **Intelligent Codebase Analysis**
+- **Intelligent Codebase Analysis**
   - AST parsing for code structure
   - Dependency graph generation
   - Import/export detection
   - Binary file detection
-  
-- 🤖 **Flexible AI Processing**
+  - Persistence layer detection (Flyway, EF Core, Prisma, Hibernate, Django, Rails, Sequelize, Alembic)
+
+- **Flexible AI Processing**
   - Local Ollama integration
     - Secure local processing
     - Interactive model selection
   - AWS Bedrock integration
-    - Claude 3.7 Sonnet support
+    - Claude Sonnet support
     - Enterprise-grade AI capabilities
+    - Extended context support (up to 1M tokens via beta header)
+    - Prompt caching to reduce cost and latency on repeated large inputs
+    - Automatic Haiku fallback on throttling exceptions
   - Customizable prompt templates
   - Context-aware generation
   - Parallel processing support
-  
-- 📝 **Documentation Generation**
-  - README.md generation
+
+- **Documentation Generation**
+  - README.md generation with optional refactoring into focused sections
   - Architecture documentation
+  - Persistence layer documentation (`docs/PERSISTENCE.md`)
+  - Installation guide (`docs/INSTALLATION.md`)
+  - Usage guide (`docs/USAGE.md`)
+  - Troubleshooting guide (`docs/TROUBLESHOOTING.md`)
+  - Contributing guidelines
   - API documentation
-  - Developer guides
-  
-- 🔄 **Smart Caching**
+
+- **Smart Caching**
   - Multi-level cache (memory + SQLite)
   - Intelligent invalidation
   - TTL support
   - Size-based limits
-  
-- ✅ **Validation**
+  - AWS Bedrock prompt caching for LLM calls
+
+- **Large Repository Support**
+  - Threshold-based activation (default: 450 files)
+  - Batch processing with configurable time limits
+  - Smart file prioritization and sampling
+  - Cache-only mode for incremental updates
+
+- **Visual Logging**
+  - Rich terminal output with color-coded messages
+  - Emoji-annotated status indicators
+  - Prompt cache performance reports
+  - Token usage summaries per generation task
+
+- **Validation**
   - Link checking (internal + external)
   - Markdown validation
   - Badge verification
   - Reference checking
-  
-- 📊 **Quality Metrics**
+
+- **Quality Metrics**
   - Readability scoring
   - Complexity analysis
   - Documentation coverage
   - Improvement suggestions
 
-- 🔄 **Repository Integration**
+- **Repository Integration**
   - Local repository analysis
   - GitHub repository cloning
   - Automatic pull request creation
@@ -279,65 +294,153 @@ python codebase_scribe.py \
 
 ## Configuration
 
-The `config.yaml` no longer specifies models. Instead, you'll choose from available models at runtime. The configuration only needs:
+The `config.yaml` file controls all aspects of the tool's behavior. Below are the key sections.
+
+### Core Options
+
+```yaml
+llm_provider: "bedrock"  # "bedrock" or "ollama"
+debug: false
+test_mode: false
+optimize_order: false
+preserve_existing: true
+exit_on_docs_only_changes: true  # Skip re-generation when only docs changed
+```
+
+### Ollama
 
 ```yaml
 ollama:
-  base_url: "http://localhost:11434"  # Ollama API endpoint
-  max_tokens: 4096  # Maximum tokens per request
-  retries: 3  # Number of retry attempts
-  retry_delay: 1.0  # Delay between retries
-  timeout: 30  # Request timeout in seconds
-
-cache:
-  enabled: true  # Set to false to disable caching
-  directory: ".cache"  # Directory to store cache files
-  location: "repo"  # "repo" or "home" for cache location
-
-templates:
-  prompts:
-    file_summary: |
-      # Custom prompt for file summaries
-      Analyze the following code file and provide a clear, concise summary:
-      File: {file_path}
-      Type: {file_type}
-      Context: {context}
-      
-      Code:
-      {code}
-    
-    project_overview: |
-      # Custom prompt for project overview
-      Generate a comprehensive overview for:
-      Project: {project_name}
-      Files: {file_count}
-      Components: {key_components}
-  
-  docs:
-    readme: |
-      # {project_name}
-      
-      {project_overview}
-      
-      ## Usage
-      {usage}
+  base_url: "http://localhost:11434"
+  max_tokens: 4096
+  retries: 3
+  retry_delay: 1.0
+  timeout: 30
+  concurrency: 1
+  temperature: 0.1
 ```
 
-The `config.yaml` supports file filtering through a blacklist system:
+### AWS Bedrock
+
+```yaml
+bedrock:
+  region: us-east-1
+  model_id: us.anthropic.claude-sonnet-4-20250514-v1:0
+  max_tokens: 8192
+  timeout: 180
+  retries: 5
+  concurrency: 10
+  verify_ssl: true
+  temperature: 0.1
+
+  # Throttling fallback — automatically retries with Haiku on ThrottlingException
+  fallback_model_id: us.anthropic.claude-haiku-4-5-20251001-v1:0
+  enable_fallback: true
+  throttling_retry_delay: 30.0
+  throttling_max_retries: 5
+
+  # Per-task output token limits
+  max_output_tokens_architecture: 32768
+  max_output_tokens_persistence: 32768
+
+  # AWS Bedrock prompt caching (reduces cost on repeated large inputs)
+  enable_prompt_caching: true
+  cache_min_tokens: 1024
+  cache_ttl_minutes: 5
+  cache_strategy: "balanced"  # conservative | balanced | aggressive
+
+  # Extended context (up to 1M tokens)
+  extended_context_enabled: true
+  extended_context_beta_header: "context-1m-2025-08-07"
+```
+
+### Cache
+
+```yaml
+cache:
+  enabled: true
+  directory: ".cache"
+  location: "home"  # "repo" or "home"
+  hash_algorithm: "md5"
+  global_directory: "readme_generator_cache"
+```
+
+### Large Repository Handling
+
+Large-repo mode activates automatically when the file count exceeds `threshold`.
+
+```yaml
+large_repo:
+  threshold: 450            # File count that triggers large-repo mode
+  max_files: 1000
+  collapsible_tree: true
+  enhanced_sampling: true
+  files_per_component: 10
+  smart_prioritization: true
+  verbose_logging: true
+  batch_processing: true
+  time_limit_minutes: 45    # Hard limit for a single run
+  cache_only_mode: true     # Only update cache, skip doc generation
+  skip_docs_on_partial: true
+  create_pr_on_batch: false
+  batch_pr_branch: "batch-processing/cache-update"
+```
+
+### Generated Documentation Sections
+
+Each section can be enabled or disabled independently. The `output_file` path is relative to the analyzed repository root.
+
+```yaml
+persistence:
+  enabled: true
+  generate_doc: true
+  output_file: "docs/PERSISTENCE.md"
+  detection_threshold: 0.2
+  supported_technologies:
+    flyway: true
+    efcore: true
+    prisma: true
+    hibernate: true
+    django: true
+    rails: true
+    sequelize: true
+    alembic: true
+
+installation:
+  enabled: true
+  output_file: "docs/INSTALLATION.md"
+
+usage:
+  enabled: true
+  output_file: "docs/USAGE.md"
+
+troubleshooting:
+  enabled: true
+  output_file: "docs/TROUBLESHOOTING.md"
+
+contributing:
+  enabled: true
+  output_file: "CONTRIBUTING.md"
+
+readme_refactor:
+  enabled: true
+  keep_brief_overview: true    # Preserve first lines of each migrated section
+  add_navigation_section: true # Add a "Documentation" nav section to README
+```
+
+### File Filtering
 
 ```yaml
 blacklist:
-  extensions: [".md", ".txt", ".log"]  # File extensions to exclude
-  path_patterns: 
-    - "/temp/"                        # Path patterns to exclude
+  extensions: [".txt", ".log"]
+  path_patterns:
+    - "/temp/"
     - "/cache/"
     - "/node_modules/"
     - "/__pycache__/"
 ```
 
-### Key Configuration Options
-- **extensions**: List of file extensions to exclude from analysis
-- **path_patterns**: List of regex patterns for paths to exclude
+See [docs/CONFIG.md](docs/CONFIG.md) for the full reference including environment variable overrides and configuration validation details.
 
 ### Remote Ollama Setup
 
@@ -367,26 +470,36 @@ Note: Ensure the Ollama server is accessible from your machine and any necessary
 
 ```
 src/
-├── analyzers/          # Code analysis tools
-│   └── codebase.py     # Repository analysis
-├── clients/            # External service clients
-│   ├── ollama.py       # Ollama API integration
-│   ├── bedrock.py      # AWS Bedrock integration
-│   └── llm_utils.py    # Shared LLM utilities
-├── generators/         # Content generation
-│   ├── contributing.py # Contributing guide generation
-│   └── readme.py       # README generation
-├── models/            # Data models
-│   └── file_info.py   # File information
-└── utils/             # Utility functions
-    ├── cache.py       # Caching system
-    ├── config.py      # Configuration
-    ├── link_validator.py  # Link validation
-    ├── markdown_validator.py  # Markdown checks
-    ├── progress.py    # Progress tracking
-    ├── prompt_manager.py  # Prompt handling
-    ├── readability.py # Readability scoring
-    └── tree_formatter.py # Project structure visualization
+├── analyzers/               # Code analysis tools
+│   ├── codebase.py          # Repository analysis
+│   └── persistence.py       # Persistence layer detection and analysis
+├── clients/                 # External service clients
+│   ├── ollama.py            # Ollama API integration
+│   ├── bedrock.py           # AWS Bedrock integration
+│   └── llm_utils.py         # Shared LLM utilities
+├── generators/              # Content generation
+│   ├── architecture.py      # Architecture documentation
+│   ├── contributing.py      # Contributing guide generation
+│   ├── installation.py      # Installation guide generation
+│   ├── mermaid.py           # Mermaid diagram generation
+│   ├── persistence.py       # Persistence layer documentation
+│   ├── readme.py            # README generation
+│   ├── troubleshooting.py   # Troubleshooting guide generation
+│   └── usage.py             # Usage guide generation
+├── models/                  # Data models
+│   └── file_info.py         # File information
+└── utils/                   # Utility functions
+    ├── cache.py             # Caching system
+    ├── config.py            # Configuration
+    ├── link_validator.py    # Link validation
+    ├── markdown_validator.py # Markdown checks
+    ├── progress.py          # Progress tracking
+    ├── prompt_cache_manager.py # AWS Bedrock prompt caching
+    ├── prompt_manager.py    # Prompt handling
+    ├── readme_refactor.py   # README splitting and navigation
+    ├── readability.py       # Readability scoring
+    ├── tree_formatter.py    # Project structure visualization
+    └── visual_logger.py     # Rich terminal output and logging
 ```
 
 ## Development
@@ -423,9 +536,11 @@ Contributions are welcome! Please read our [Contributing Guide](docs/CONTRIBUTIN
 
 ## Documentation
 
+### Tool Reference
 - [API Documentation](docs/API.md)
 - [Architecture Guide](docs/ARCHITECTURE.md)
 - [Architecture Generator](docs/ARCHITECTURE_GENERATOR.md)
+- [Configuration Guide](docs/CONFIG.md)
 - [Development Guide](docs/DEVELOPMENT.md)
 - [Contributing Guide](docs/CONTRIBUTING.md)
 - [Contributing Generator](docs/CONTRIBUTING_GENERATOR.md)
@@ -434,6 +549,18 @@ Contributions are welcome! Please read our [Contributing Guide](docs/CONTRIBUTIN
 - [CodebaseAnalyzer](docs/CODEBASE_ANALYZER.md)
 - [LLM Clients](docs/LLM_CLIENTS.md)
 - [Message Manager](docs/MESSAGE_MANAGER.md)
+
+### Generated Documentation (Output Files)
+
+The following files are generated in the analyzed repository by default. Each can be enabled or disabled via `config.yaml`.
+
+| Output File | Config Section | Description |
+|---|---|---|
+| `docs/PERSISTENCE.md` | `persistence` | Database schema, migrations, ORM usage |
+| `docs/INSTALLATION.md` | `installation` | Step-by-step installation instructions |
+| `docs/USAGE.md` | `usage` | CLI and API usage guide |
+| `docs/TROUBLESHOOTING.md` | `troubleshooting` | Common issues and resolutions |
+| `CONTRIBUTING.md` | `contributing` | Contributor guidelines |
 
 ## License
 

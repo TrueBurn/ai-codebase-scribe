@@ -32,6 +32,9 @@ ENV/
 *.swp
 *.swo
 
+# Claude Code
+.claude/
+
 # Testing
 .pytest_cache/
 **/.pytest_cache/
@@ -51,6 +54,7 @@ pytest-env/
 docs/_build/
 .cache_directory/
 temp_cache/
+.worktrees/
 
 # Exclude cache files in test folders
 tests/**/.cache/

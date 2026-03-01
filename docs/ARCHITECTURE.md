@@ -21,50 +21,74 @@ The codebase-scribe-ai is a comprehensive documentation generation system that a
 ```mermaid
 graph TD
     A[Repository] --> B[CodebaseAnalyzer]
+    A --> P[PersistenceAnalyzer]
     B --> C[File Analysis]
     B --> D[Dependency Graph]
-    
+
     subgraph "LLM Clients"
         E1[OllamaClient]
-        E2[BedrockClient] 
+        E2[BedrockClient]
         E[LLMClientFactory] --> E1
         E[LLMClientFactory] --> E2
+        E2 --> PC[PromptCacheManager]
     end
-    
+
     C --> E
     D --> E
-    
+    P --> E
+
     subgraph "Generators"
         F1[README Generator]
-        F2[Architecture Generator] 
+        F2[Architecture Generator]
         F3[Contributing Generator]
         F4[Mermaid Generator]
+        F5[Persistence Generator]
+        F6[Installation Generator]
+        F7[Usage Generator]
+        F8[Troubleshooting Generator]
         F2 --> F4
     end
-    
+
     E1 --> F1
     E1 --> F2
     E1 --> F3
     E2 --> F1
     E2 --> F2
     E2 --> F3
-    
+    E2 --> F5
+    E2 --> F6
+    E2 --> F7
+    E2 --> F8
+
     F1 --> G[Markdown Files]
     F2 --> G
     F3 --> G
-    
+    F5 --> G
+    F6 --> G
+    F7 --> G
+    F8 --> G
+
+    RR[README Refactor] --> F1
+
     H[Cache System] --> B
     H --> E
-    
+
+    VL[VisualLogger] --> E
+    VL --> F5
+
     J[Validators] --> F1
     J --> F2
     J --> F3
-    
+
     K[ScribeConfig] --> B
     K --> E
     K --> F1
     K --> F2
     K --> F3
+    K --> F5
+    K --> F6
+    K --> F7
+    K --> F8
 ```
 
 ### Key Components Interaction
@@ -92,24 +116,32 @@ sequenceDiagram
 
 ### System Process Flow
 
-1. **Repository Analysis**: The CodebaseAnalyzer examines the repository structure, creating a file manifest with metadata for each relevant file.
+1. **Repository Analysis**: The `CodebaseAnalyzer` examines the repository structure, creating a file manifest with metadata for each relevant file. When the file count exceeds the `large_repo.threshold`, large-repo mode activates batch processing and smart prioritization.
 
-2. **Configuration Management**: The ScribeConfig class manages all system settings, providing type-safe configuration access to all components.
+2. **Persistence Layer Analysis**: The `PersistenceAnalyzer` independently scans the repository for migration files and ORM patterns to produce a `PersistenceLayerInfo` object describing detected technologies, tables, relationships, and migrations.
 
-3. **LLM Provider Selection**: Based on configuration, an appropriate LLM client (Ollama or Bedrock) is selected for AI generation tasks.
+3. **Configuration Management**: The `ScribeConfig` class manages all system settings, providing type-safe configuration access to all components.
 
-4. **Documentation Generation**: Multiple specialized generators create different documentation types:
-   - README Generator: Creates project overview documentation
-   - Architecture Generator: Creates system architecture documentation with Mermaid diagrams
-   - Contributing Generator: Creates contribution guidelines
+4. **LLM Provider Selection**: Based on configuration, an appropriate LLM client (Ollama or Bedrock) is selected for AI generation tasks. The `BedrockClient` additionally initializes a `PromptCacheManager` for prompt-level caching and configures throttling fallback to a secondary model.
 
-5. **Diagram Generation**: The Mermaid Generator creates visual representations of code relationships and system architecture.
+5. **Documentation Generation**: Multiple specialized generators create different documentation types:
+   - **README Generator**: Creates project overview documentation
+   - **Architecture Generator**: Creates system architecture documentation with Mermaid diagrams
+   - **Contributing Generator**: Creates contribution guidelines
+   - **Persistence Generator**: Creates `docs/PERSISTENCE.md` from `PersistenceLayerInfo`
+   - **Installation Generator**: Creates `docs/INSTALLATION.md` from detected setup patterns
+   - **Usage Generator**: Creates `docs/USAGE.md` from entry points and examples
+   - **Troubleshooting Generator**: Creates `docs/TROUBLESHOOTING.md` from error patterns
 
-6. **Cache Management**: A multi-level caching system improves performance by storing analysis results and LLM responses.
+6. **README Refactoring**: The `readme_refactor` utility replaces migrated sections in `README.md` with brief overviews and navigation links to the new dedicated files.
 
-7. **Output Validation**: Validators check the generated documentation for quality, completeness, and correctness.
+7. **Diagram Generation**: The Mermaid Generator creates visual representations of code relationships and system architecture.
 
-8. **Path Optimization**: The system employs path compression to reduce token usage with LLMs, particularly for deep directory structures.
+8. **Cache Management**: A multi-level caching system improves performance by storing analysis results and LLM responses.
+
+9. **Output Validation**: Validators check the generated documentation for quality, completeness, and correctness.
+
+10. **Path Optimization**: The system employs path compression to reduce token usage with LLMs, particularly for deep directory structures.
 
 This architecture provides a flexible, maintainable system that can generate high-quality documentation for a variety of repository types and structures.
 
@@ -357,7 +389,7 @@ async def generate_architecture(
 ) -> str:
     """
     Generate architecture documentation for the repository.
-    
+
     This function uses an LLM to generate comprehensive architecture documentation
     with proper formatting, table of contents, and sections. If the LLM fails or
     returns invalid content, it falls back to a basic architecture document.
@@ -375,6 +407,70 @@ async def generate_architecture(
 - Fallback mechanism for when LLM generation fails
 - Validation of LLM-generated content
 - Logging of errors and warnings
+
+### 5. PersistenceAnalyzer
+
+The `PersistenceAnalyzer` (`src/analyzers/persistence.py`) scans a repository for evidence of persistence layer frameworks and extracts schema information without requiring a live database connection.
+
+#### Supported Technologies
+
+| Technology | Detection Patterns |
+|---|---|
+| Flyway | `db/migration/`, `V{n}__*.sql` files |
+| EF Core | `Migrations/`, `DbContext` subclasses |
+| Prisma | `schema.prisma`, `prisma/migrations/` |
+| Hibernate | `@Entity`, `@Table` annotations, `hbm.xml` |
+| Django | `migrations/`, `models.py` with `Model` subclasses |
+| Rails / ActiveRecord | `db/migrate/`, `*.rb` migration files |
+| Sequelize | `migrations/`, `models/` with `define()` calls |
+| Alembic | `alembic/versions/`, `alembic.ini` |
+
+#### Key Data Structures
+
+```python
+class PersistenceType(Enum):
+    FLYWAY = "flyway"
+    EFCORE = "efcore"
+    PRISMA = "prisma"
+    HIBERNATE = "hibernate"
+    DJANGO = "django"
+    RAILS = "rails"
+    SEQUELIZE = "sequelize"
+    ALEMBIC = "alembic"
+    UNKNOWN = "unknown"
+
+@dataclass
+class PersistenceLayerInfo:
+    """Complete information about the persistence layer."""
+    # Detected technology type, tables, views, relationships, migrations
+```
+
+### 6. Documentation Generators (Installation, Usage, Troubleshooting)
+
+Three lightweight generators share the same structure and use `CodebaseAnalyzer` output and LLM content generation to produce focused documentation files.
+
+| Generator | Output | Config Section |
+|---|---|---|
+| `src/generators/installation.py` | `docs/INSTALLATION.md` | `installation` |
+| `src/generators/usage.py` | `docs/USAGE.md` | `usage` |
+| `src/generators/troubleshooting.py` | `docs/TROUBLESHOOTING.md` | `troubleshooting` |
+
+Each generator validates output length against a minimum threshold (`CONTENT_THRESHOLDS`) and applies readability scoring before writing the final file.
+
+### 7. README Refactoring Utility
+
+`src/utils/readme_refactor.py` post-processes `README.md` after the individual documentation files are generated. It:
+
+1. Locates each migrated section by name using `doc_utils.extract_section_by_name()`.
+2. Replaces the full section content with a brief overview (optionally the first 2–3 lines) and a link to the dedicated documentation file.
+3. Injects or updates a navigation section linking all generated docs when `add_navigation_section: true`.
+
+### 8. VisualLogger and PromptCacheManager
+
+These two utilities (`src/utils/visual_logger.py` and `src/utils/prompt_cache_manager.py`) work together to provide observability over the generation pipeline.
+
+- **VisualLogger**: Singleton that wraps Python `logging` with `rich` console formatting. Provides structured methods for progress, success, warning, error, token usage, and cache metrics output. Falls back gracefully to standard logging when `rich` is not installed.
+- **PromptCacheManager**: Tracks which prompt components are eligible for AWS Bedrock prompt caching, builds `cache_control`-annotated message payloads, and accumulates per-run metrics (cache hit rate, tokens read from cache, estimated cost savings).
 
 ## Data Flow
 
@@ -535,29 +631,56 @@ The codebase follows a modular structure with clear separation of concerns:
 
 ```
 src/
-├── analyzers/          # Code analysis tools
-│   └── codebase.py     # Repository analysis
-├── clients/            # External service clients
-│   └── ollama.py       # Ollama API integration
-├── generators/         # Content generation
-│   ├── readme.py       # README generation
-│   └── mermaid.py      # Mermaid diagram generation
-├── models/            # Data models
-│   └── file_info.py   # File information
-└── utils/             # Utility functions
-    ├── cache.py       # Caching system
-    ├── github_utils.py # GitHub integration utilities
-    ├── badges.py      # Badge generation utility
-    └── [other utility modules]
+├── analyzers/               # Code analysis tools
+│   ├── codebase.py          # Repository traversal, dependency graph, file manifest
+│   └── persistence.py       # Persistence layer detection and schema extraction
+├── clients/                 # External service clients
+│   ├── base_llm.py          # Abstract base class for all LLM clients
+│   ├── bedrock.py           # AWS Bedrock integration
+│   ├── llm_factory.py       # Client factory and provider selection
+│   ├── llm_utils.py         # Shared formatting and analysis utilities
+│   ├── message_manager.py   # Prompt message construction
+│   └── ollama.py            # Ollama API integration
+├── generators/              # Content generation
+│   ├── architecture.py      # Architecture documentation with Mermaid diagrams
+│   ├── contributing.py      # Contributing guide generation
+│   ├── installation.py      # Installation guide generation
+│   ├── mermaid.py           # Mermaid diagram generation
+│   ├── persistence.py       # Persistence layer documentation generation
+│   ├── readme.py            # README generation
+│   ├── troubleshooting.py   # Troubleshooting guide generation
+│   └── usage.py             # Usage guide generation
+├── models/                  # Data models
+│   └── file_info.py         # File information and metadata
+└── utils/                   # Utility functions
+    ├── badges.py            # Badge generation
+    ├── cache.py             # Multi-level caching (memory + SQLite)
+    ├── config.py            # Configuration loading
+    ├── config_class.py      # ScribeConfig and related dataclasses
+    ├── config_utils.py      # Configuration helpers
+    ├── doc_utils.py         # Document section manipulation
+    ├── github_utils.py      # GitHub integration utilities
+    ├── link_validator.py    # Internal and external link validation
+    ├── markdown_validator.py # Markdown structure validation
+    ├── path_compression.py  # Token-saving path compression
+    ├── progress.py          # Progress bar management
+    ├── prompt_cache_manager.py  # AWS Bedrock prompt caching strategy
+    ├── prompt_manager.py    # Prompt template management
+    ├── readme_refactor.py   # README splitting and navigation injection
+    ├── readability.py       # Readability scoring
+    ├── retry.py             # Async retry decorator
+    ├── tokens.py            # Token counting utilities
+    ├── tree_formatter.py    # Directory tree visualization
+    └── visual_logger.py     # Rich terminal output and logging
 ```
 
 ### Directory Purposes
 
-- **analyzers/**: Contains tools for analyzing repository structure and code relationships
-- **clients/**: Manages external service interactions, particularly with Ollama
-- **generators/**: Handles generation of documentation files
-- **models/**: Defines data structures and types
-- **utils/**: Houses utility functions and helper modules
+- **analyzers/**: Produces structured representations of the repository — file manifest, dependency graph, and persistence layer schema.
+- **clients/**: Manages all LLM provider interactions through a common abstract interface.
+- **generators/**: Transforms repository analysis and LLM-generated content into final documentation files.
+- **models/**: Defines shared data structures.
+- **utils/**: Houses cross-cutting concerns: caching, configuration, logging, validation, and token management.
 
 ## Future Considerations
 
@@ -582,25 +705,11 @@ src/
 # Project Architecture
 
 ## Overview
-The AI README Generator is a Python-based tool that analyzes codebases and generates comprehensive documentation using local AI models.
+The Codebase Scribe AI is a Python-based tool that analyzes codebases and generates comprehensive documentation using AI models (AWS Bedrock or local Ollama).
 
 ## Project Structure
-```
-src/
-├── analyzers/          # Code analysis tools
-│   └── codebase.py     # Repository analysis
-├── clients/            # External service clients
-│   └── ollama.py       # Ollama API integration
-├── generators/         # Content generation
-│   ├── readme.py       # README generation
-│   └── mermaid.py      # Mermaid diagram generation
-├── models/            # Data models
-│   └── file_info.py   # File information
-└── utils/             # Utility functions
-    ├── cache.py       # Caching system
-    ├── badges.py      # Badge generation utility
-    └── [other utility modules]
-```
+
+See the [Project Structure](#project-structure) section above for the full annotated directory tree.
 
 ## Project Index
 <details open>
