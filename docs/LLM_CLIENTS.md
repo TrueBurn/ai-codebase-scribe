@@ -7,9 +7,13 @@ This document provides detailed information about the LLM (Large Language Model)
 - [BaseLLMClient](#basellmclient)
 - [OllamaClient](#ollamaclient)
 - [BedrockClient](#bedrockclient)
+  - [Prompt Caching](#prompt-caching)
+  - [Throttling Fallback](#throttling-fallback)
+  - [Extended Context](#extended-context)
 - [LLMClientFactory](#llmclientfactory)
 - [MessageManager](#messagemanager)
 - [LLM Utilities](#llm-utilities)
+- [Visual Logging Integration](#visual-logging-integration)
 - [Usage Examples](#usage-examples)
 - [Extending with New Providers](#extending-with-new-providers)
 
@@ -383,6 +387,54 @@ async def _invoke_model_with_token_management(self, messages, max_tokens=None, r
     # Implementation details...
 ```
 
+### Prompt Caching
+
+`BedrockClient` integrates with `PromptCacheManager` (`src/utils/prompt_cache_manager.py`) to cache stable portions of large prompts using AWS Bedrock's native prompt-caching feature. This is separate from the file-level SQLite cache.
+
+When `enable_prompt_caching: true` is set in the `bedrock` config block, the client:
+
+1. Identifies cacheable components — project structure, technology report, key components, and system constraints — using `PromptCacheManager.create_cacheable_components()`.
+2. Marks components that exceed the configured token threshold (`cache_min_tokens`, adjusted by `cache_strategy`) with a `cache_control: {type: ephemeral}` block.
+3. Assembles the final message payload via `PromptCacheManager.build_cached_message_content()` and sends it to Bedrock.
+4. Reads `cache_read_input_tokens` and `cache_creation_input_tokens` from the Bedrock response to update running hit/miss metrics.
+5. Reports aggregate metrics (hit rate, tokens saved, average generation time) at the end of a run via `VisualLogger.prompt_cache_metrics()`.
+
+**Cache strategies** control the minimum token threshold at which a component is eligible for caching:
+
+| Strategy | Effective threshold |
+|---|---|
+| `conservative` | `cache_min_tokens * 2` |
+| `balanced` | `cache_min_tokens` (default) |
+| `aggressive` | `cache_min_tokens / 2` |
+
+Task-specific content (the unique portion of each request) is never cached.
+
+### Throttling Fallback
+
+When `enable_fallback: true` is configured, `BedrockClient` automatically handles `ThrottlingException` errors by retrying the same request with the model specified in `fallback_model_id` (typically a smaller, faster model). The client waits `throttling_retry_delay` seconds between attempts and gives up after `throttling_max_retries` total attempts.
+
+This prevents pipeline failures during periods of high API load without requiring manual intervention.
+
+```yaml
+bedrock:
+  fallback_model_id: "us.anthropic.claude-haiku-4-5-20251001-v1:0"
+  enable_fallback: true
+  throttling_retry_delay: 30.0
+  throttling_max_retries: 5
+```
+
+### Extended Context
+
+`BedrockClient` supports the AWS Bedrock 1M-token context window when `extended_context_enabled: true`. It passes the beta header specified in `extended_context_beta_header` with each API request, enabling analysis of very large repositories without truncation.
+
+```yaml
+bedrock:
+  extended_context_enabled: true
+  extended_context_beta_header: "context-1m-2025-08-07"
+```
+
+---
+
 ## LLMClientFactory
 
 The `LLMClientFactory` is responsible for creating the appropriate LLM client based on configuration. It uses a registration pattern to support extensibility and includes configuration validation.
@@ -655,6 +707,28 @@ DEFAULT_VENDOR_PATTERNS = [
 ```
 
 These constants can be adjusted to customize the behavior of the utility functions.
+
+## Visual Logging Integration
+
+All LLM clients use `VisualLogger` (`src/utils/visual_logger.py`) for terminal output when the `rich` package is available. If `rich` is not installed the system falls back to standard `logging`.
+
+The `VisualLogger` is a singleton accessed via `get_visual_logger()`. Clients use it to report:
+
+- **Generation start/completion** — includes elapsed time and document type.
+- **Token usage** — input tokens, output tokens, cache-read tokens, and cache-write tokens per request.
+- **Prompt cache metrics** — aggregate hit rate, efficiency rate, and estimated token cost savings displayed as a formatted table at the end of a run.
+- **Throttling events** — warnings when a fallback model is selected.
+
+`VisualLogger` methods used by the LLM layer:
+
+| Method | Purpose |
+|---|---|
+| `info(message, emoji)` | General status messages with optional emoji prefix |
+| `success(message, emoji)` | Success events (green output) |
+| `warning(message, emoji)` | Non-fatal issues such as throttling |
+| `error(message, emoji)` | Failures |
+| `document_generation(doc_type, status, elapsed_time, token_metrics)` | Structured generation status with token breakdown |
+| `prompt_cache_metrics(metrics)` | End-of-run prompt cache performance table |
 
 ## Usage Examples
 

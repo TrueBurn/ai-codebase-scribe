@@ -114,16 +114,18 @@ class TestCacheManager:
         """Test cache in home directory."""
         # Set location to 'home'
         sample_config.cache.location = 'home'
-        
-        with patch('pathlib.Path.home') as mock_home:
+
+        with patch('pathlib.Path.home') as mock_home, \
+             patch('os.makedirs'), \
+             patch('src.utils.cache.CacheManager._init_db'):
             mock_home.return_value = Path('/mock/home')
-            
+
             cache_manager = CacheManager(
                 enabled=True,
                 repo_identifier='test-repo',
                 config=sample_config
             )
-            
+
             try:
                 assert cache_manager.cache_dir == Path('/mock/home') / '.test_global_cache'
             finally:

@@ -77,10 +77,10 @@ def ollama_client(mock_config):
         # Create client
         client = OllamaClient(mock_config)
         
-        # Mock chat response
+        # Mock chat response — must be >= 50 chars and contain '##' to pass _validate_file_summary
         mock_chat_response = {
             'message': {
-                'content': 'Test response content'
+                'content': '## PRIMARY FUNCTION\n\nThis is a test file summary that provides a detailed explanation of the code components and their relationships within the project architecture.'
             }
         }
         mock_async_client_instance.chat.return_value = mock_chat_response
@@ -171,10 +171,11 @@ def test_fix_markdown_issues(ollama_client):
 async def test_generate_summary(ollama_client):
     """Test the generate_summary method."""
     result = await ollama_client.generate_summary("Test prompt")
-    
+
     # Verify that the chat method was called with the correct parameters
     ollama_client.client.chat.assert_called_once()
-    assert result == "Test response content"
+    assert result is not None
+    assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_generate_summary_token_limit(ollama_client):
@@ -348,7 +349,8 @@ async def test_generate_project_overview(ollama_client, mock_file_manifest):
             mock_task.cancel.assert_called_once()
             
             # Verify the result
-            assert result == "Test response content"
+            assert result is not None
+            assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_generate_component_relationships(ollama_client, mock_file_manifest):
@@ -362,7 +364,8 @@ async def test_generate_component_relationships(ollama_client, mock_file_manifes
         ollama_client.client.chat.assert_called_once()
         
         # Verify the result
-        assert result == "Test response content"
+        assert result is not None
+        assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_generate_architecture_content(ollama_client, mock_file_manifest):
@@ -395,7 +398,8 @@ async def test_generate_architecture_content(ollama_client, mock_file_manifest):
             
             # Verify the result contains the expected content
             # The actual implementation might add additional content like project structure
-            assert "Test response content" in result
+            assert result is not None
+            assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_generate_usage_guide(ollama_client, mock_file_manifest):
@@ -409,7 +413,8 @@ async def test_generate_usage_guide(ollama_client, mock_file_manifest):
         ollama_client.client.chat.assert_called_once()
         
         # Verify the result
-        assert result == "Test response content"
+        assert result is not None
+        assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_generate_contributing_guide(ollama_client, mock_file_manifest):
@@ -420,7 +425,8 @@ async def test_generate_contributing_guide(ollama_client, mock_file_manifest):
     ollama_client.client.chat.assert_called_once()
     
     # Verify the result
-    assert result == "Test response content"
+    assert result is not None
+    assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_generate_license_info(ollama_client, mock_file_manifest):
@@ -431,7 +437,8 @@ async def test_generate_license_info(ollama_client, mock_file_manifest):
     ollama_client.client.chat.assert_called_once()
     
     # Verify the result
-    assert result == "Test response content"
+    assert result is not None
+    assert "## PRIMARY FUNCTION" in result
 
 @pytest.mark.asyncio
 async def test_enhance_documentation(ollama_client, mock_file_manifest):
@@ -448,7 +455,8 @@ async def test_enhance_documentation(ollama_client, mock_file_manifest):
         ollama_client.client.chat.assert_called_once()
         
         # Verify the result
-        assert result == "Test response content"
+        assert result is not None
+        assert "## PRIMARY FUNCTION" in result
 
 def test_derive_project_name(ollama_client, mock_file_manifest):
     """Test the _derive_project_name method."""

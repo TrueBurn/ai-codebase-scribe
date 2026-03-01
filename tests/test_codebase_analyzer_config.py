@@ -18,14 +18,14 @@ from src.utils.config_class import ScribeConfig
 def sample_config_dict():
     """Create a sample configuration object."""
     from src.utils.config_class import ScribeConfig, BlacklistConfig
-    
+
     config = ScribeConfig()
     config.debug = True
     config.test_mode = True
     config.no_cache = True
     config.blacklist = BlacklistConfig(
         extensions=['.log', '.tmp'],
-        path_patterns=['/node_modules/', '/__pycache__/']
+        path_patterns=['node_modules', '__pycache__']
     )
     return config
 
@@ -34,14 +34,14 @@ def sample_config_dict():
 def sample_config():
     """Create a sample ScribeConfig instance."""
     from src.utils.config_class import ScribeConfig, BlacklistConfig
-    
+
     config = ScribeConfig()
     config.debug = True
     config.test_mode = True
     config.no_cache = True
     config.blacklist = BlacklistConfig(
         extensions=['.log', '.tmp'],
-        path_patterns=['/node_modules/', '/__pycache__/']
+        path_patterns=['node_modules', '__pycache__']
     )
     return config
 
@@ -91,7 +91,7 @@ class TestCodebaseAnalyzer:
         assert analyzer.debug is True
         assert analyzer.repo_path == temp_repo_path
         assert '.log' in analyzer.blacklist_extensions
-        assert '/node_modules/' in analyzer.blacklist_patterns
+        assert 'node_modules' in analyzer.blacklist_patterns
 
     def test_init_with_scribe_config(self, sample_config, temp_repo_path):
         """Test initializing CodebaseAnalyzer with a ScribeConfig instance."""
@@ -100,7 +100,7 @@ class TestCodebaseAnalyzer:
         assert analyzer.debug is True
         assert analyzer.repo_path == temp_repo_path
         assert '.log' in analyzer.blacklist_extensions
-        assert '/node_modules/' in analyzer.blacklist_patterns
+        assert 'node_modules' in analyzer.blacklist_patterns
 
     @patch('src.analyzers.codebase.CacheManager')
     def test_cache_initialization(self, mock_cache_manager, sample_config, temp_repo_path):

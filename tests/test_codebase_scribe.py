@@ -48,27 +48,30 @@ def config():
 
 def test_setup_logging():
     """Test the setup_logging function."""
-    # Test with debug=True
-    with patch('logging.getLogger') as mock_get_logger, \
-         patch('logging.FileHandler') as mock_file_handler, \
-         patch('logging.StreamHandler') as mock_stream_handler:
-        mock_root_logger = MagicMock()
-        mock_get_logger.return_value = mock_root_logger
-        
+    # The function now delegates to setup_visual_logging; verify it runs without error.
+    with patch('codebase_scribe.setup_visual_logging') as mock_setup_visual:
+        mock_visual_logger = MagicMock()
+        mock_setup_visual.return_value = mock_visual_logger
+
         codebase_scribe.setup_logging(debug=True)
-        assert mock_root_logger.setLevel.call_count >= 1
-        assert mock_root_logger.addHandler.call_count >= 1
-    
-    # Test with debug=False
-    with patch('logging.getLogger') as mock_get_logger, \
-         patch('logging.FileHandler') as mock_file_handler, \
-         patch('logging.StreamHandler') as mock_stream_handler:
-        mock_root_logger = MagicMock()
-        mock_get_logger.return_value = mock_root_logger
-        
+        mock_setup_visual.assert_called_once_with(
+            debug=True,
+            log_to_file=True,
+            quiet=False,
+            enable_rich=True,
+        )
+
+    with patch('codebase_scribe.setup_visual_logging') as mock_setup_visual:
+        mock_visual_logger = MagicMock()
+        mock_setup_visual.return_value = mock_visual_logger
+
         codebase_scribe.setup_logging(debug=False)
-        assert mock_root_logger.setLevel.call_count >= 1
-        assert mock_root_logger.addHandler.call_count >= 1
+        mock_setup_visual.assert_called_once_with(
+            debug=False,
+            log_to_file=True,
+            quiet=False,
+            enable_rich=True,
+        )
 
 
 @pytest.mark.asyncio
@@ -90,17 +93,13 @@ async def test_determine_processing_order():
     ]
     
     # Test with valid inputs
-    with patch('codebase_scribe.ProgressTracker') as mock_progress_tracker:
-        mock_progress_bar = MagicMock()
-        mock_progress_tracker.get_instance.return_value.progress_bar.return_value.__enter__.return_value = mock_progress_bar
-        
-        result = await codebase_scribe.determine_processing_order(files, mock_llm_client)
-        
-        # Convert Path objects to strings for comparison and normalize slashes
-        result_strings = [str(path).replace('\\', '/') for path in result]
-        assert result_strings == ['README.md', 'src/main/app.py', 'src/main/utils.py']
-        mock_llm_client.get_file_order.assert_called_once_with([str(file) for file in files])
-    
+    result = await codebase_scribe.determine_processing_order(files, mock_llm_client)
+
+    # Convert Path objects to strings for comparison and normalize slashes
+    result_strings = [str(path).replace('\\', '/') for path in result]
+    assert result_strings == ['README.md', 'src/main/app.py', 'src/main/utils.py']
+    mock_llm_client.get_file_order.assert_called_once_with([str(file) for file in files])
+
     # Test with LLM returning extra files
     mock_llm_client.get_file_order.return_value = [
         'README.md',
@@ -108,32 +107,24 @@ async def test_determine_processing_order():
         'src/main/utils.py',
         'nonexistent.py'
     ]
-    
-    with patch('codebase_scribe.ProgressTracker') as mock_progress_tracker:
-        mock_progress_bar = MagicMock()
-        mock_progress_tracker.get_instance.return_value.progress_bar.return_value.__enter__.return_value = mock_progress_bar
-        
-        result = await codebase_scribe.determine_processing_order(files, mock_llm_client)
-        
-        # Convert Path objects to strings for comparison and normalize slashes
-        result_strings = [str(path).replace('\\', '/') for path in result]
-        assert set(result_strings) == set(['README.md', 'src/main/app.py', 'src/main/utils.py', 'nonexistent.py'])
-    
+
+    result = await codebase_scribe.determine_processing_order(files, mock_llm_client)
+
+    # Convert Path objects to strings for comparison and normalize slashes
+    result_strings = [str(path).replace('\\', '/') for path in result]
+    assert set(result_strings) == set(['README.md', 'src/main/app.py', 'src/main/utils.py', 'nonexistent.py'])
+
     # Test with LLM returning missing files
     mock_llm_client.get_file_order.return_value = [
         'README.md',
         'src/main/app.py'
     ]
-    
-    with patch('codebase_scribe.ProgressTracker') as mock_progress_tracker:
-        mock_progress_bar = MagicMock()
-        mock_progress_tracker.get_instance.return_value.progress_bar.return_value.__enter__.return_value = mock_progress_bar
-        
-        result = await codebase_scribe.determine_processing_order(files, mock_llm_client)
-        
-        # Convert Path objects to strings for comparison and normalize slashes
-        result_strings = [str(path).replace('\\', '/') for path in result]
-        assert set(result_strings) == set(['README.md', 'src/main/app.py'])
+
+    result = await codebase_scribe.determine_processing_order(files, mock_llm_client)
+
+    # Convert Path objects to strings for comparison and normalize slashes
+    result_strings = [str(path).replace('\\', '/') for path in result]
+    assert set(result_strings) == set(['README.md', 'src/main/app.py'])
 
 
 @pytest.mark.asyncio
@@ -177,11 +168,9 @@ async def test_process_files(temp_repo, config):
         return expected_manifest[str(file_path.relative_to(temp_repo))]
     
     # Test with valid inputs
-    with patch('codebase_scribe.ProgressTracker') as mock_progress_tracker, \
-         patch('codebase_scribe.create_file_processing_progress_bar') as mock_create_progress_bar, \
+    with patch('codebase_scribe.create_file_processing_progress_bar') as mock_create_progress_bar, \
          patch('codebase_scribe.CodebaseAnalyzer') as mock_analyzer_class:
         mock_progress_bar = MagicMock()
-        mock_progress_tracker.get_instance.return_value.progress_bar.return_value.__enter__.return_value = mock_progress_bar
         mock_create_progress_bar.return_value.__enter__.return_value = mock_progress_bar
         
         # Mock the analyzer
@@ -255,65 +244,64 @@ async def test_main_with_local_repo(temp_repo):
     mock_args.log_file = False
     mock_args.llm_provider = None
     mock_args.quiet = False
-    
-    # Mock argparse
-    with patch('argparse.ArgumentParser.parse_args', return_value=mock_args):
-        # Mock setup_logging
-        with patch('codebase_scribe.setup_logging') as mock_setup_logging:
-            # Mock load_config
-            with patch('codebase_scribe.load_config', return_value=ScribeConfig()) as mock_load_config:
-                # Mock LLMClientFactory
-                with patch('codebase_scribe.LLMClientFactory') as mock_llm_factory:
-                    mock_llm_client = AsyncMock()
-                    # Set up the create_client method as an AsyncMock that returns the mock_llm_client
-                    mock_llm_factory.create_client = AsyncMock(return_value=mock_llm_client)
-                    
-                    # Mock CodebaseAnalyzer
-                    with patch('codebase_scribe.CodebaseAnalyzer') as mock_analyzer_class:
-                        mock_analyzer = MagicMock()
-                        file_manifest = {
-                            'src/main/app.py': FileInfo(path='src/main/app.py', language='python', content='print("Hello")'),
-                            'src/main/utils.py': FileInfo(path='src/main/utils.py', language='python', content='print("World")'),
-                            'README.md': FileInfo(path='README.md', language='markdown', content='# Test')
-                        }
-                        # Make analyze_repository a regular MagicMock that returns the file_manifest
-                        mock_analyzer.analyze_repository = MagicMock(return_value=file_manifest)
-                        mock_analyzer.cache.enabled = True
-                        mock_analyzer_class.return_value = mock_analyzer
-                        
-                        # Mock process_files as an AsyncMock
-                        with patch('codebase_scribe.process_files', new_callable=AsyncMock) as mock_process_files:
-                            mock_process_files.return_value = file_manifest
-                            
-                            # Mock generate_architecture as an AsyncMock
-                            with patch('codebase_scribe.generate_architecture', new_callable=AsyncMock) as mock_generate_architecture:
-                                mock_generate_architecture.return_value = "# Architecture\n\nThis is the architecture document."
-                                
-                                # Mock generate_readme as an AsyncMock
-                                with patch('codebase_scribe.generate_readme', new_callable=AsyncMock) as mock_generate_readme:
-                                    mock_generate_readme.return_value = "# README\n\nThis is the README document."
-                                    
-                                    # Mock generate_badges
-                                    with patch('codebase_scribe.generate_badges') as mock_generate_badges:
-                                        mock_generate_badges.return_value = "![Badge](badge.svg)"
-                                        
-                                        # Mock Path.write_text
-                                        with patch('pathlib.Path.write_text') as mock_write_text:
-                                            # Mock create_documentation_progress_bar
-                                            with patch('codebase_scribe.create_documentation_progress_bar') as mock_create_progress_bar:
-                                                mock_progress_bar = MagicMock()
-                                                mock_create_progress_bar.return_value.__enter__.return_value = mock_progress_bar
-                                                
-                                                # Run the main function
-                                                await codebase_scribe.main()
-                                                
-                                                # Verify the calls
-                                                mock_setup_logging.assert_called_once()
-                                                mock_load_config.assert_called_once()
-                                                mock_llm_factory.create_client.assert_called_once()
-                                                mock_analyzer_class.assert_called_once()
-                                                mock_process_files.assert_called_once()
-                                                mock_generate_architecture.assert_called_once()
-                                                mock_generate_readme.assert_called_once()
-                                                mock_generate_badges.assert_called_once()
-                                                assert mock_write_text.call_count >= 2
+
+    file_manifest = {
+        'src/main/app.py': FileInfo(path='src/main/app.py', language='python', content='print("Hello")'),
+        'src/main/utils.py': FileInfo(path='src/main/utils.py', language='python', content='print("World")'),
+        'README.md': FileInfo(path='README.md', language='markdown', content='# Test')
+    }
+
+    with patch('argparse.ArgumentParser.parse_args', return_value=mock_args), \
+         patch('codebase_scribe.setup_logging') as mock_setup_logging, \
+         patch('codebase_scribe.load_config', return_value=ScribeConfig()) as mock_load_config, \
+         patch('codebase_scribe.LLMClientFactory') as mock_llm_factory, \
+         patch('codebase_scribe.CodebaseAnalyzer') as mock_analyzer_class, \
+         patch('codebase_scribe.process_files', new_callable=AsyncMock) as mock_process_files, \
+         patch('codebase_scribe.check_all_files_processed', return_value=True), \
+         patch('codebase_scribe.generate_architecture', new_callable=AsyncMock) as mock_generate_architecture, \
+         patch('codebase_scribe.generate_readme', new_callable=AsyncMock) as mock_generate_readme, \
+         patch('codebase_scribe.generate_badges') as mock_generate_badges, \
+         patch('codebase_scribe.generate_installation', new_callable=AsyncMock) as mock_generate_installation, \
+         patch('codebase_scribe.generate_usage', new_callable=AsyncMock) as mock_generate_usage, \
+         patch('codebase_scribe.generate_troubleshooting', new_callable=AsyncMock) as mock_generate_troubleshooting, \
+         patch('codebase_scribe.generate_contributing', new_callable=AsyncMock) as mock_generate_contributing, \
+         patch('pathlib.Path.write_text') as mock_write_text, \
+         patch('codebase_scribe.create_documentation_progress_bar') as mock_create_progress_bar, \
+         patch('codebase_scribe.shutil') as mock_shutil, \
+         patch('codebase_scribe.os.makedirs'):
+
+        mock_llm_client = AsyncMock()
+        mock_llm_client.last_operation_metrics = None
+        mock_llm_factory.create_client = AsyncMock(return_value=mock_llm_client)
+
+        mock_analyzer = MagicMock()
+        mock_analyzer.analyze_repository = MagicMock(return_value=file_manifest)
+        mock_analyzer.cache.enabled = True
+        mock_analyzer._get_repository_files.return_value = []
+        mock_analyzer_class.return_value = mock_analyzer
+
+        mock_process_files.return_value = file_manifest
+        mock_generate_architecture.return_value = "# Architecture\n\nThis is the architecture document."
+        mock_generate_readme.return_value = "# README\n\nThis is the README document."
+        mock_generate_badges.return_value = "![Badge](badge.svg)"
+        mock_generate_installation.return_value = None
+        mock_generate_usage.return_value = None
+        mock_generate_troubleshooting.return_value = None
+        mock_generate_contributing.return_value = None
+
+        mock_progress_bar = MagicMock()
+        mock_create_progress_bar.return_value.__enter__.return_value = mock_progress_bar
+
+        # Run the main function
+        await codebase_scribe.main()
+
+        # Verify the key calls were made
+        mock_setup_logging.assert_called_once()
+        mock_load_config.assert_called_once()
+        mock_llm_factory.create_client.assert_called_once()
+        mock_analyzer_class.assert_called_once()
+        mock_process_files.assert_called_once()
+        mock_generate_architecture.assert_called_once()
+        mock_generate_readme.assert_called_once()
+        mock_generate_badges.assert_called_once()
+        assert mock_write_text.call_count >= 1

@@ -516,15 +516,29 @@ async def test_enhance_documentation(bedrock_config):
 @pytest.mark.asyncio
 async def test_invoke_model_with_token_management(bedrock_config):
     """Test the _invoke_model_with_token_management method."""
+    from src.utils.config_class import BedrockConfig
+
+    # Disable prompt caching so the standard (non-cached) invocation path is exercised
+    bedrock_config.bedrock = BedrockConfig(
+        region='us-east-1',
+        model_id='test-model-id',
+        max_tokens=4096,
+        timeout=120,
+        retries=3,
+        retry_delay=1.0,
+        temperature=0,
+        enable_prompt_caching=False,
+    )
+
     with patch('src.clients.bedrock.boto3.client') as mock_boto3_client, \
          patch('src.clients.bedrock.asyncio.to_thread') as mock_to_thread, \
          patch('src.clients.bedrock.asyncio.wait_for') as mock_wait_for, \
          patch.dict('os.environ', {'AWS_BEDROCK_MODEL_ID': ''}):
-        
+
         # Setup mocks
         mock_client = MagicMock()
         mock_boto3_client.return_value = mock_client
-        
+
         # Mock response
         mock_response = MagicMock()
         mock_body = MagicMock()
@@ -532,46 +546,47 @@ async def test_invoke_model_with_token_management(bedrock_config):
             'content': [{'text': 'Test response'}]
         })
         mock_response.get.return_value = mock_body
-        
+
         # Mock wait_for to return the response
         mock_wait_for.return_value = mock_response
-        
+
         # Create client
         client = BedrockClient(bedrock_config)
         client.token_counter = MagicMock()
         client.token_counter.count_tokens.return_value = 100
-        client.token_counter.get_token_limit.return_value = 1000
+        client.token_counter.get_token_limit.return_value = 200000
         client._fix_markdown_issues = MagicMock(return_value="Fixed test response")
-        
+
         # Create messages
         messages = [
             {"role": "system", "content": "System content"},
             {"role": "user", "content": "User content"}
         ]
-        
-        # Test method
+
+        # Test method - tokens within limit (100 + 4096 safely within 200000)
         result = await client._invoke_model_with_token_management(messages)
-        
+
         # Verify result
         assert result == "Fixed test response"
-        
+
         # Verify wait_for was called
         mock_wait_for.assert_called_once()
-        
-        # Test with token limit exceeded
+
+        # Test with token limit exceeded - new impl uses _prioritize_architectural_content
         client.token_counter.count_tokens.return_value = 2000
-        client.token_counter.handle_oversized_input = MagicMock(return_value="Truncated content")
+        client.token_counter.get_token_limit.return_value = 1000
+        client._prioritize_architectural_content = MagicMock(return_value="Truncated content")
         client.token_counter.truncate_text = MagicMock(return_value="Further truncated content")
-        
+
         # Reset mocks
         mock_wait_for.reset_mock()
-        
-        # Test method again
+
+        # Test method again - oversized input should trigger content prioritization
         result = await client._invoke_model_with_token_management(messages)
-        
-        # Verify token handling methods were called
-        client.token_counter.handle_oversized_input.assert_called_once()
-        
+
+        # Verify smart content prioritization was used (replaces old handle_oversized_input)
+        client._prioritize_architectural_content.assert_called_once()
+
         # Verify result
         assert result == "Fixed test response"
 

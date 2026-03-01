@@ -21,6 +21,22 @@ bedrock:
   concurrency: 10
   verify_ssl: false # Set to false to disable SSL verification for corporate proxies
   temperature: 0.1 # Add temperature setting
+  # Fallback configuration
+  fallback_model_id: us.anthropic.claude-haiku-4-5-20251001-v1:0
+  enable_fallback: true
+  throttling_retry_delay: 30.0
+  throttling_max_retries: 5
+  # Output token limits
+  max_output_tokens_architecture: 32768
+  max_output_tokens_persistence: 32768
+  # Prompt caching configuration
+  enable_prompt_caching: true
+  cache_min_tokens: 1024
+  cache_ttl_minutes: 5
+  cache_strategy: "balanced"  # conservative, balanced, aggressive
+  # Extended context configuration (1M tokens)
+  extended_context_enabled: true
+  extended_context_beta_header: "context-1m-2025-08-07"
 
 cache:
   enabled: true # Set to false to disable caching
@@ -110,3 +126,64 @@ blacklist:
     - ".*\\.cc$"
     - ".*\\.h$"
     - ".*\\.hpp$"
+
+# Exit early if only documentation files changed (skip re-generation)
+exit_on_docs_only_changes: true
+
+# Large repository handling
+large_repo:
+  threshold: 450          # Number of files that triggers large-repo mode
+  max_files: 1000
+  collapsible_tree: true
+  enhanced_sampling: true
+  files_per_component: 10
+  smart_prioritization: true
+  verbose_logging: true
+  batch_processing: true
+  time_limit_minutes: 45
+  cache_only_mode: true
+  skip_docs_on_partial: true
+  create_pr_on_batch: false  # disabled by default (requires GitHub token)
+  batch_pr_branch: "batch-processing/cache-update"
+
+# Persistence layer documentation
+persistence:
+  enabled: true
+  generate_doc: true
+  output_file: "docs/PERSISTENCE.md"
+  detection_threshold: 0.2
+  supported_technologies:
+    flyway: true
+    efcore: true
+    prisma: true
+    hibernate: true
+    django: true
+    rails: true
+    sequelize: true
+    alembic: true
+
+# Installation guide generation
+installation:
+  enabled: true
+  output_file: "docs/INSTALLATION.md"
+
+# Usage guide generation
+usage:
+  enabled: true
+  output_file: "docs/USAGE.md"
+
+# Troubleshooting guide generation
+troubleshooting:
+  enabled: true
+  output_file: "docs/TROUBLESHOOTING.md"
+
+# Contributing guide generation
+contributing:
+  enabled: true
+  output_file: "CONTRIBUTING.md"
+
+# README refactoring after doc splitting
+readme_refactor:
+  enabled: true
+  keep_brief_overview: true
+  add_navigation_section: true

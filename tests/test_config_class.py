@@ -19,7 +19,14 @@ from src.utils.config_class import (
     BlacklistConfig,
     PromptTemplatesConfig,
     DocTemplatesConfig,
-    TemplatesConfig
+    TemplatesConfig,
+    LargeRepoConfig,
+    PersistenceConfig,
+    InstallationConfig,
+    UsageConfig,
+    TroubleshootingConfig,
+    ContributingConfig,
+    ReadmeRefactorConfig,
 )
 
 @pytest.fixture
@@ -152,11 +159,74 @@ class TestScribeConfig:
     def test_write_to_file(self, sample_config, temp_config_file):
         """Test writing configuration to file."""
         sample_config.write_to_file(temp_config_file)
-        
+
         # Read the file back and verify
         with open(temp_config_file, 'r') as f:
             config_dict = yaml.safe_load(f)
-        
+
         assert config_dict['debug'] is True
         assert config_dict['llm_provider'] == 'ollama'
         assert config_dict['ollama']['base_url'] == 'http://localhost:11434'
+
+    def test_new_dataclasses_have_defaults(self):
+        """Test that new dataclasses can be instantiated with default values."""
+        config = ScribeConfig()
+
+        assert isinstance(config.large_repo, LargeRepoConfig)
+        assert config.large_repo.threshold == 450
+        assert config.large_repo.max_files == 1000
+
+        assert isinstance(config.persistence, PersistenceConfig)
+        assert config.persistence.enabled is True
+        assert config.persistence.generate_doc is True
+        assert config.persistence.output_file == "docs/PERSISTENCE.md"
+
+        assert isinstance(config.installation, InstallationConfig)
+        assert config.installation.enabled is True
+        assert config.installation.output_file == "docs/INSTALLATION.md"
+
+        assert isinstance(config.usage, UsageConfig)
+        assert config.usage.enabled is True
+        assert config.usage.output_file == "docs/USAGE.md"
+
+        assert isinstance(config.troubleshooting, TroubleshootingConfig)
+        assert config.troubleshooting.enabled is True
+        assert config.troubleshooting.output_file == "docs/TROUBLESHOOTING.md"
+
+        assert isinstance(config.contributing, ContributingConfig)
+        assert config.contributing.enabled is True
+        assert config.contributing.output_file == "CONTRIBUTING.md"
+
+        assert isinstance(config.readme_refactor, ReadmeRefactorConfig)
+        assert config.readme_refactor.enabled is True
+        assert config.readme_refactor.keep_brief_overview is True
+
+    def test_bedrock_config_new_fields(self):
+        """Test that BedrockConfig has the new fields added in the Capitec migration."""
+        bedrock = BedrockConfig()
+
+        # Fallback configuration
+        assert hasattr(bedrock, 'fallback_model_id')
+        assert hasattr(bedrock, 'enable_fallback')
+        assert bedrock.enable_fallback is True
+        assert hasattr(bedrock, 'throttling_retry_delay')
+        assert hasattr(bedrock, 'throttling_max_retries')
+
+        # Output token limits
+        assert hasattr(bedrock, 'max_output_tokens_architecture')
+        assert bedrock.max_output_tokens_architecture == 32768
+        assert hasattr(bedrock, 'max_output_tokens_persistence')
+        assert bedrock.max_output_tokens_persistence == 32768
+
+        # Prompt caching
+        assert hasattr(bedrock, 'enable_prompt_caching')
+        assert hasattr(bedrock, 'cache_min_tokens')
+        assert bedrock.cache_min_tokens == 1024
+        assert hasattr(bedrock, 'cache_ttl_minutes')
+        assert hasattr(bedrock, 'cache_strategy')
+        assert bedrock.cache_strategy == 'balanced'
+
+        # Extended context
+        assert hasattr(bedrock, 'extended_context_enabled')
+        assert bedrock.extended_context_enabled is True
+        assert hasattr(bedrock, 'extended_context_beta_header')

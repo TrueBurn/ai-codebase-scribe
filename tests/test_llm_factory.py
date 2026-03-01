@@ -94,15 +94,36 @@ def test_register_client_type():
         async def generate_architecture_content(self, file_manifest, analyzer):
             return "Mock architecture content"
         
+        async def generate_installation_guide(self, file_manifest):
+            return ""
+
+        async def generate_troubleshooting_guide(self, file_manifest):
+            return ""
+
+        async def generate_persistence_doc(self, file_manifest, persistence_info):
+            return ""
+
+        async def analyze_migration_contents(self, migration_contents):
+            return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+
+        async def analyze_single_migration(self, migration_info):
+            return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+
+        async def aggregate_migration_analyses(self, individual_analyses):
+            return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+
+        async def generate_structured_json_response(self, messages, max_tokens=None):
+            return ""
+
         async def generate_component_relationships(self, file_manifest):
             return "Mock component relationships"
-        
+
         async def enhance_documentation(self, existing_content, file_manifest, doc_type):
             return "Mock enhanced documentation"
-        
+
         def set_project_structure(self, structure):
             pass
-        
+
         async def get_file_order(self, project_files):
             return list(project_files.keys())
     

@@ -334,17 +334,18 @@ class TestReadmeGenerator:
         """Test the generate_new_readme function."""
         # Setup mocks
         mock_generate_overview.return_value = "This is a test project overview."
+        # generate_new_readme now calls generate_section twice: for usage_guide and license_info.
+        # The contributing section is now a hardcoded static string, not an LLM call.
         mock_generate_section.side_effect = [
             "This is a usage guide.",
-            "This is a contributing guide.",
             "This is license information."
         ]
         mock_validate.return_value = "# Validated Content\n\nThis is validated content."
-        
+
         # Test generating new README
         repo_path = tmp_path / "repo"
         repo_path.mkdir()
-        
+
         result = await generate_new_readme(
             repo_path=repo_path,
             llm_client=mock_llm_client,
@@ -353,10 +354,10 @@ class TestReadmeGenerator:
             architecture_file_exists=True,
             config=test_config
         )
-        
+
         # Verify mocks were called correctly
         mock_generate_overview.assert_called_once()
-        assert mock_generate_section.call_count == 3
+        assert mock_generate_section.call_count == 2
         mock_validate.assert_called_once()
         
         # Verify result

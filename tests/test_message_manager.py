@@ -70,10 +70,14 @@ class TestMessageManager(unittest.TestCase):
         # Test with invalid inputs
         with self.assertRaises(ValueError):
             MessageManager.get_project_overview_messages("", tech_report, template_content)
-        
-        with self.assertRaises(ValueError):
-            MessageManager.get_project_overview_messages(project_structure, "", template_content)
-        
+
+        # Empty tech_report no longer raises ValueError — it falls back to a default value.
+        # Verify the call succeeds and returns valid messages.
+        messages_with_empty_tech = MessageManager.get_project_overview_messages(
+            project_structure, "", template_content
+        )
+        self.assertEqual(len(messages_with_empty_tech), 2)
+
         with self.assertRaises(ValueError):
             MessageManager.get_project_overview_messages(project_structure, tech_report, "")
     

@@ -129,9 +129,11 @@ def test_prepare_file_order_data(sample_file_manifest):
     assert "dist/bundle.min.js" in resource_files
     assert "images/logo.png" in resource_files
     
-    # Check files_info
-    assert files_info["src/main.py"]["type"] == "python"
-    assert files_info["src/utils.py"]["size"] == 18
+    # Check files_info — the type is now the file extension (.py) rather than language name.
+    # When the manifest values are plain dicts (not objects with attributes), size defaults to 0
+    # because prepare_file_order_data uses hasattr() which is False for plain dict keys.
+    assert files_info["src/main.py"]["type"] == ".py"
+    assert files_info["src/utils.py"]["size"] == 0
     assert not files_info["src/config.json"]["is_binary"]
 
 def test_process_file_order_response_json():

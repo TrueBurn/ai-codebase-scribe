@@ -1,4 +1,13 @@
-# CodebaseAnalyzer Documentation
+# Codebase Analyzers
+
+This document covers the analyzer components of the Codebase Scribe AI system. Two analyzers are available:
+
+- **`CodebaseAnalyzer`** (`src/analyzers/codebase.py`) — General repository structure, file manifest, and dependency analysis.
+- **`PersistenceAnalyzer`** (`src/analyzers/persistence.py`) — Database migration and ORM framework detection and schema extraction.
+
+---
+
+# CodebaseAnalyzer
 
 The `CodebaseAnalyzer` class is a core component of the Codebase Scribe AI system, responsible for analyzing repository structure and content. This document provides detailed information about its functionality, usage, and implementation.
 
@@ -226,3 +235,107 @@ python -m pytest tests/test_codebase.py tests/test_integration.py --cov=src.anal
 2. **Improve Cache Handling**: Address issues with file handles not being properly closed.
 
 3. **Further Increase Test Coverage**: Add more tests for error handling branches and edge cases.
+
+---
+
+# PersistenceAnalyzer
+
+The `PersistenceAnalyzer` class (`src/analyzers/persistence.py`) detects and analyzes database persistence patterns within a repository. It is designed to be used alongside `CodebaseAnalyzer`, operating on the same repository path but focusing exclusively on migration files, ORM model definitions, and schema artifacts.
+
+## Overview
+
+`PersistenceAnalyzer` scans a repository for well-known persistence layer patterns and extracts structured metadata including detected technologies, table definitions, relationships, views, and migration history — without requiring a live database connection.
+
+## Supported Technologies
+
+| Technology | Type | Detection Signals |
+|---|---|---|
+| Flyway | SQL migration runner | `db/migration/`, `V{n}__*.sql` naming convention |
+| EF Core | .NET ORM | `Migrations/` directory, `DbContext` subclasses |
+| Prisma | Node.js ORM | `schema.prisma`, `prisma/migrations/` |
+| Hibernate | Java ORM | `@Entity`, `@Table` annotations, `*.hbm.xml` |
+| Django | Python ORM | `migrations/`, `models.py` with `Model` subclasses |
+| Rails / ActiveRecord | Ruby ORM | `db/migrate/`, ActiveRecord migration files |
+| Sequelize | Node.js ORM | `migrations/`, `models/` with `define()` calls |
+| Alembic | Python migration tool | `alembic/versions/`, `alembic.ini` |
+
+## Key Data Structures
+
+```python
+class PersistenceType(Enum):
+    """Enumeration of supported persistence layer types."""
+    FLYWAY = "flyway"
+    EFCORE = "efcore"
+    PRISMA = "prisma"
+    HIBERNATE = "hibernate"
+    DJANGO = "django"
+    RAILS = "rails"
+    SEQUELIZE = "sequelize"
+    ALEMBIC = "alembic"
+    UNKNOWN = "unknown"
+
+@dataclass
+class TableInfo:
+    """Information about a database table."""
+    name: str
+    columns: List[Dict[str, Any]]
+    primary_keys: List[str]
+    foreign_keys: List[Dict[str, str]]
+    indexes: List[Dict[str, Any]]
+    constraints: List[Dict[str, Any]]
+    migration_file: Optional[str]
+
+@dataclass
+class RelationshipInfo:
+    """Information about table relationships."""
+    from_table: str
+    to_table: str
+    from_column: str
+    to_column: str
+    relationship_type: str  # "one-to-one", "one-to-many", "many-to-many"
+    constraint_name: Optional[str]
+
+@dataclass
+class PersistenceLayerInfo:
+    """Complete information about the persistence layer."""
+    # Aggregates PersistenceType, tables, views, relationships, migrations
+```
+
+## Detection Threshold
+
+The `detection_threshold` configuration value (default `0.2`) sets the minimum confidence score for a technology to be included in the analysis. Raising this value makes detection more conservative.
+
+```yaml
+persistence:
+  detection_threshold: 0.2
+```
+
+## Integration with Persistence Generator
+
+After analysis, `PersistenceLayerInfo` is passed to `src/generators/persistence.py`, which uses an LLM to synthesize the extracted schema data into a readable `docs/PERSISTENCE.md` file covering:
+
+- Detected technologies and their versions where available
+- Database schema (tables, columns, keys, indexes)
+- Table relationships and ERD summary
+- Migration history and patterns
+
+## Usage Example
+
+```python
+from pathlib import Path
+from src.analyzers.persistence import PersistenceAnalyzer
+from src.utils.config_class import ScribeConfig
+
+config = ScribeConfig()
+analyzer = PersistenceAnalyzer(Path('/path/to/repo'), config)
+persistence_info = analyzer.analyze()
+
+print(f"Detected: {persistence_info.technology}")
+print(f"Tables: {[t.name for t in persistence_info.tables]}")
+```
+
+## Testing
+
+```bash
+python -m pytest tests/test_architecture.py -k persistence
+```

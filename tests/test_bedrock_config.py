@@ -112,6 +112,36 @@ class TestBedrockClient:
             assert client.max_tokens == 2048
             assert client.retries == 5
 
+    @patch('src.clients.bedrock.load_dotenv')
+    def test_new_bedrock_config_fields_have_defaults(self, mock_load_dotenv):
+        """Test that new BedrockConfig fields from the Capitec migration have correct defaults."""
+        from src.utils.config_class import BedrockConfig
+
+        bedrock = BedrockConfig(
+            region='us-east-1',
+            model_id='us.anthropic.claude-sonnet-4-20250514-v1:0',
+        )
+
+        # Fallback configuration
+        assert bedrock.fallback_model_id == 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
+        assert bedrock.enable_fallback is True
+        assert bedrock.throttling_retry_delay == 30.0
+        assert bedrock.throttling_max_retries == 5
+
+        # Output token limits
+        assert bedrock.max_output_tokens_architecture == 32768
+        assert bedrock.max_output_tokens_persistence == 32768
+
+        # Prompt caching
+        assert bedrock.enable_prompt_caching is True
+        assert bedrock.cache_min_tokens == 1024
+        assert bedrock.cache_ttl_minutes == 5
+        assert bedrock.cache_strategy == 'balanced'
+
+        # Extended context
+        assert bedrock.extended_context_enabled is True
+        assert bedrock.extended_context_beta_header == 'context-1m-2025-08-07'
+
     @pytest.mark.asyncio
     @patch('src.clients.bedrock.load_dotenv')
     @patch('src.clients.bedrock.boto3')

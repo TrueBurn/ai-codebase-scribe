@@ -41,6 +41,27 @@ class TestBaseLLMClient(unittest.TestCase):
             async def generate_architecture_content(self, file_manifest: Dict[str, Any], analyzer: Any) -> str:
                 return "Architecture content"
 
+            async def generate_installation_guide(self, file_manifest: Dict[str, Any]) -> str:
+                return ""
+
+            async def generate_troubleshooting_guide(self, file_manifest: Dict[str, Any]) -> str:
+                return ""
+
+            async def generate_persistence_doc(self, file_manifest: Dict[str, Any], persistence_info: Any) -> str:
+                return ""
+
+            async def analyze_migration_contents(self, migration_contents: List[Dict[str, Any]]) -> Dict[str, Any]:
+                return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+
+            async def analyze_single_migration(self, migration_info: Dict[str, Any]) -> Dict[str, Any]:
+                return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+
+            async def aggregate_migration_analyses(self, individual_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+                return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+
+            async def generate_structured_json_response(self, messages: List[Dict[str, str]], max_tokens: Optional[int] = None) -> str:
+                return ""
+
             async def generate_component_relationships(self, file_manifest: Dict[str, Any]) -> str:
                 return "Component relationships"
 

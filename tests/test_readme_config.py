@@ -159,7 +159,7 @@ class TestReadmeGenerator:
         """Test generate_new_readme with a dictionary config."""
         with patch('src.generators.readme.extract_license_info') as mock_extract_license:
             mock_extract_license.return_value = "MIT License"
-            
+
             result = await generate_new_readme(
                 repo_path=temp_repo_path,
                 llm_client=mock_llm_client,
@@ -168,18 +168,19 @@ class TestReadmeGenerator:
                 architecture_file_exists=False,
                 config=sample_config_dict
             )
-            
+
             assert "Test Project" in result
             assert "Project overview" in result
             assert "# # Usage" in result
-            assert "Please refer to project documentation for contribution guidelines" in result
+            # Contributing is now a static link to CONTRIBUTING.md, not an LLM-generated text
+            assert "CONTRIBUTING.md" in result
 
     @pytest.mark.asyncio
     async def test_generate_new_readme_with_scribe_config(self, temp_repo_path, mock_llm_client, file_manifest, sample_config):
         """Test generate_new_readme with a ScribeConfig instance."""
         with patch('src.generators.readme.extract_license_info') as mock_extract_license:
             mock_extract_license.return_value = "MIT License"
-            
+
             result = await generate_new_readme(
                 repo_path=temp_repo_path,
                 llm_client=mock_llm_client,
@@ -188,8 +189,9 @@ class TestReadmeGenerator:
                 architecture_file_exists=False,
                 config=sample_config
             )
-            
+
             assert "Test Project" in result
             assert "Project overview" in result
             assert "# # Usage" in result
-            assert "Please refer to project documentation for contribution guidelines" in result
+            # Contributing is now a static link to CONTRIBUTING.md, not an LLM-generated text
+            assert "CONTRIBUTING.md" in result
