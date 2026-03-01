@@ -1,9 +1,3 @@
-> **⚠️ WORK IN PROGRESS ⚠️**
->
-> This project is under active development and is **NOT** production-ready.
-> Breaking changes are likely to occur without prior notice.
-> Use at your own risk in non-production environments only.
-
 # CodeBase Scribe AI
 
 A Python tool that generates comprehensive project documentation using AI models. It analyzes your codebase, generates documentation, validates links, checks readability, and ensures high-quality output with flexible AI provider options.

@@ -7,9 +7,9 @@ This module provides functions to refactor README.md files when content is
 migrated to separate documentation files (INSTALLATION.md, USAGE.md, etc.).
 """
 
-from pathlib import Path
-from typing import List, Dict, Any
 import logging
+from pathlib import Path
+from typing import Any, Dict, List
 
 # Try to import visual logger, fallback to regular logging
 try:
@@ -20,7 +20,7 @@ except ImportError:
     _use_visual_logging = False
 
 # Import section manipulation utilities
-from .doc_utils import insert_link_at_section, extract_section_by_name
+from .doc_utils import extract_section_by_name, insert_link_at_section
 
 
 def _get_logger():

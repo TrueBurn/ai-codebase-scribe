@@ -1,10 +1,10 @@
 # Standard library imports
 import logging
 import re
-from pathlib import Path
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from enum import Enum
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 # Try to import visual logger, fallback to regular logging
 try:

@@ -7,8 +7,8 @@ message structures and performance tracking for LLM calls.
 """
 
 import logging
-from typing import Dict, List, Any
 from dataclasses import dataclass
+from typing import Any, Dict, List
 
 # Try to import visual logger, fallback to regular logging
 try:

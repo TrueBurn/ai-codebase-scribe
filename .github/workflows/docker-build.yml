@@ -2,10 +2,11 @@ name: Docker Build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feature/**', 'fix/**', 'chore/**' ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+    types: [ opened, synchronize, reopened ]
 
 jobs:
   build:

@@ -5,7 +5,7 @@ import logging
 import time
 import traceback
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 # Try to import visual logger, fallback to regular logging
 try:
@@ -26,9 +26,9 @@ def _get_logger():
 # Local imports
 from ..analyzers.persistence import PersistenceAnalyzer, PersistenceType
 from ..clients.base_llm import BaseLLMClient
-from ..utils.markdown_validator import MarkdownValidator
-from ..utils.config_class import ScribeConfig
 from ..utils.cache import CacheManager
+from ..utils.config_class import ScribeConfig
+from ..utils.markdown_validator import MarkdownValidator
 from ..utils.progress_utils import (
     create_migration_analysis_progress_bar,
 )
@@ -543,7 +543,7 @@ async def generate_persistence(
                             f"Markdown validation encountered error: {type(e).__name__}: {str(e)}, but content appears valid - proceeding"
                         )
                     if config.debug:
-                        logging.error(f"Validation error details:")
+                        logging.error("Validation error details:")
                         logging.error(
                             f"  Content length: {len(persistence_content) if persistence_content else 0}"
                         )
@@ -688,7 +688,7 @@ def generate_fallback_persistence(
         relationship_count = len(relationships)
         index_count = len(indexes)
 
-        content += f"The database schema consists of:\n\n"
+        content += "The database schema consists of:\n\n"
         content += f"- **Tables:** {table_count}\n"
         if view_count > 0:
             content += f"- **Views:** {view_count}\n"
@@ -1172,9 +1172,9 @@ async def _analyze_migrations_per_file(
             )
 
             if cached_analysis:
-                logging.debug(f"   ✅ Cache HIT - Using cached analysis")
+                logging.debug("   ✅ Cache HIT - Using cached analysis")
             else:
-                logging.debug(f"   ❌ Cache MISS - Will analyze and cache")
+                logging.debug("   ❌ Cache MISS - Will analyze and cache")
 
             if cached_analysis:
                 # Cache hit - use debug level logging to reduce verbosity
@@ -1229,7 +1229,7 @@ async def _analyze_migrations_per_file(
                                 cache_manager.cache_migration_analysis(
                                     relative_file_path, individual_analysis
                                 )
-                                logging.debug(f"   ✅ Successfully cached analysis")
+                                logging.debug("   ✅ Successfully cached analysis")
                             except Exception as cache_error:
                                 logger = _get_logger()
                                 if _use_visual_logging:

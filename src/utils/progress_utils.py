@@ -12,10 +12,10 @@ from src.utils.progress import ProgressTracker
 
 def create_file_processing_progress_bar(total: int) -> Any:
     """Create a progress bar for file processing.
-    
+
     Args:
         total: Total number of files to process
-        
+
     Returns:
         A progress bar instance
     """
@@ -25,14 +25,14 @@ def create_file_processing_progress_bar(total: int) -> Any:
         desc="Processing files",
         unit="file",
         ncols=150,
-        bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]',
-        colour='green'
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+        colour="green",
     )
 
 
 def create_optimization_progress_bar() -> Any:
     """Create a progress bar for optimization.
-    
+
     Returns:
         A progress bar instance
     """
@@ -42,8 +42,8 @@ def create_optimization_progress_bar() -> Any:
         desc="Optimizing file order",
         unit="step",
         ncols=150,
-        bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]',
-        colour='blue'
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}]",
+        colour="blue",
     )
 
 

@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List, Type, Union
-from ..utils.tokens import TokenCounter
+from typing import Any, Dict, List, Optional, Type, Union
+
 from ..utils.config_class import ScribeConfig
+from ..utils.tokens import TokenCounter
 
 
 class BaseLLMClient(ABC):

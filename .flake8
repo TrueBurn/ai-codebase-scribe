@@ -1,0 +1,26 @@
+[flake8]
+max-line-length = 120
+extend-ignore =
+    # Black-compatible ignores
+    E203,
+    W503,
+    # Long lines in docstrings / URLs that black cannot wrap
+    E501,
+    # Unused imports — handled by IDE, not enforced in CI
+    F401,
+    # Module-level import not at top (needed for optional deps)
+    E402,
+    # Ambiguous variable names (l, O, I) — not an issue in this codebase
+    E741,
+per-file-ignores =
+    # Tests use many assert-style comparisons that flake8 flags
+    tests/*:W0611,F811
+exclude =
+    .git,
+    __pycache__,
+    .worktrees,
+    build,
+    dist,
+    *.egg-info,
+    .venv,
+    venv

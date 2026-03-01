@@ -5,7 +5,7 @@ import logging
 import re
 import traceback
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
 # Try to import visual logger, fallback to regular logging
 try:
@@ -23,13 +23,14 @@ def _get_logger():
     return logging.getLogger(__name__)
 
 
+from ..analyzers.codebase import CodebaseAnalyzer
+
 # Local imports
 from ..clients.base_llm import BaseLLMClient
-from ..utils.markdown_validator import MarkdownValidator
-from ..utils.readability import ReadabilityScorer
-from ..analyzers.codebase import CodebaseAnalyzer
 from ..utils.config_class import ScribeConfig
 from ..utils.doc_utils import extract_section_by_name
+from ..utils.markdown_validator import MarkdownValidator
+from ..utils.readability import ReadabilityScorer
 
 # Constants for configuration
 CONTENT_THRESHOLDS = {

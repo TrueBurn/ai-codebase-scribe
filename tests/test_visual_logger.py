@@ -9,15 +9,20 @@ setup_visual_logging() completes without raising.
 """
 
 import logging
-import sys
 import os
+import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 
 # Ensure project root is on the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.utils.visual_logger import VisualLogger, get_visual_logger, setup_visual_logging
+from src.utils.visual_logger import (
+    VisualLogger,
+    get_visual_logger,
+    setup_visual_logging,
+)
 
 
 class TestVisualLogger:
@@ -74,7 +79,9 @@ class TestVisualLogger:
 
     def test_debug_method_does_not_raise(self):
         """Test that debug() does not raise."""
-        logger = VisualLogger(name="test-visual-logger-debug", log_level="DEBUG", enable_rich=False)
+        logger = VisualLogger(
+            name="test-visual-logger-debug", log_level="DEBUG", enable_rich=False
+        )
         logger.debug("Debug message")
 
     def test_format_number_returns_string(self):
@@ -106,6 +113,7 @@ class TestGetVisualLogger:
         """Test that get_visual_logger() returns a VisualLogger instance."""
         # Reset the module-level singleton so we get a fresh instance
         import src.utils.visual_logger as vl_module
+
         original = vl_module._visual_logger
         vl_module._visual_logger = None
 
@@ -118,6 +126,7 @@ class TestGetVisualLogger:
     def test_returns_singleton(self):
         """Test that get_visual_logger() returns the same instance on repeated calls."""
         import src.utils.visual_logger as vl_module
+
         original = vl_module._visual_logger
         vl_module._visual_logger = None
 
@@ -136,11 +145,12 @@ class TestSetupVisualLogging:
         """Test that setup_visual_logging() completes without raising."""
         # Reset singleton
         import src.utils.visual_logger as vl_module
+
         original = vl_module._visual_logger
         vl_module._visual_logger = None
 
         try:
-            with patch('src.utils.visual_logger.Path.mkdir'):
+            with patch("src.utils.visual_logger.Path.mkdir"):
                 result = setup_visual_logging(
                     debug=False,
                     log_to_file=False,
@@ -154,6 +164,7 @@ class TestSetupVisualLogging:
     def test_does_not_raise_in_debug_mode(self):
         """Test that setup_visual_logging() works in debug mode."""
         import src.utils.visual_logger as vl_module
+
         original = vl_module._visual_logger
         vl_module._visual_logger = None
 

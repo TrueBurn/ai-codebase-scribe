@@ -8,23 +8,24 @@ can be created, and has_meaningful_persistence_content() works correctly
 with sample persistence info objects.
 """
 
-import sys
 import os
-import tempfile
 import shutil
-import pytest
+import sys
+import tempfile
 from pathlib import Path
 
+import pytest
+
 # Ensure project root is on the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.analyzers.persistence import (
     PersistenceAnalyzer,
     PersistenceLayerInfo,
     PersistenceType,
+    RelationshipInfo,
     TableInfo,
     ViewInfo,
-    RelationshipInfo,
     has_meaningful_persistence_content,
 )
 from src.utils.config_class import ScribeConfig
@@ -75,7 +76,9 @@ class TestPersistenceAnalyzerInstantiation:
         analyzer = PersistenceAnalyzer(repo_path=temp_repo, config=scribe_config)
         assert analyzer.persistence_info is None
 
-    def test_has_persistence_layer_returns_false_before_analysis(self, temp_repo, scribe_config):
+    def test_has_persistence_layer_returns_false_before_analysis(
+        self, temp_repo, scribe_config
+    ):
         """Test that has_persistence_layer() is False before analysis."""
         analyzer = PersistenceAnalyzer(repo_path=temp_repo, config=scribe_config)
         assert analyzer.has_persistence_layer() is False
@@ -155,7 +158,11 @@ class TestHasMeaningfulPersistenceContent:
         info = PersistenceLayerInfo(
             persistence_type=PersistenceType.FLYWAY,
             migration_files=["V1__Create_users.sql"],
-            schema_data={"tables": [{"name": "users"}], "relationships": [], "indexes": []},
+            schema_data={
+                "tables": [{"name": "users"}],
+                "relationships": [],
+                "indexes": [],
+            },
         )
         result = has_meaningful_persistence_content(info)
         assert result is True
@@ -200,7 +207,11 @@ class TestHasMeaningfulPersistenceContent:
                     "type": "csharp",
                 }
             ],
-            schema_data={"tables": [{"name": "products"}], "relationships": [], "indexes": []},
+            schema_data={
+                "tables": [{"name": "products"}],
+                "relationships": [],
+                "indexes": [],
+            },
         )
         result = has_meaningful_persistence_content(info)
         assert result is True
@@ -226,7 +237,9 @@ class TestPersistenceAnalyzerAnalyze:
         result = analyzer.analyze()
         assert result is None
 
-    def test_has_persistence_layer_false_after_empty_analysis(self, temp_repo, scribe_config):
+    def test_has_persistence_layer_false_after_empty_analysis(
+        self, temp_repo, scribe_config
+    ):
         """Test that has_persistence_layer() is still False after empty analysis."""
         analyzer = PersistenceAnalyzer(repo_path=temp_repo, config=scribe_config)
         analyzer.analyze()
@@ -238,7 +251,7 @@ class TestPersistenceAnalyzerAnalyze:
         analyzer.analyze()
         summary = analyzer.get_summary()
         assert isinstance(summary, dict)
-        assert summary['has_persistence'] is False
+        assert summary["has_persistence"] is False
 
     def test_flyway_detection_with_migration_files(self, temp_repo, scribe_config):
         """Test that Flyway is detected when SQL migration files are present."""
@@ -270,9 +283,9 @@ class TestPersistenceAnalyzerAnalyze:
         analyzer.analyze()
         summary = analyzer.get_summary()
 
-        assert summary['has_persistence'] is True
-        assert summary['persistence_type'] == PersistenceType.FLYWAY.value
-        assert summary['migration_count'] >= 1
+        assert summary["has_persistence"] is True
+        assert summary["persistence_type"] == PersistenceType.FLYWAY.value
+        assert summary["migration_count"] >= 1
 
 
 class TestTableInfo:

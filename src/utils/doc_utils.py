@@ -4,9 +4,9 @@
 Utilities for documentation generation and manipulation.
 """
 
-import re
 import logging
-from typing import Optional, Tuple, List
+import re
+from typing import List, Optional, Tuple
 
 # Try to import visual logger, fallback to regular logging
 try:

@@ -6,7 +6,7 @@ import os
 import re
 import traceback
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Any, Dict, List, Optional
 
 # Third-party imports
 import boto3
@@ -30,29 +30,31 @@ def _get_logger():
     return logging.getLogger(__name__)
 
 
-# Local imports
-from .base_llm import BaseLLMClient
-from .message_manager import MessageManager
 from src.utils.config_class import ScribeConfig
-from .llm_utils import (
-    format_project_structure,
-    find_common_dependencies,
-    identify_key_components,
-    get_default_order,
-    fix_markdown_issues,
-    prepare_file_order_data,
-    process_file_order_response
-)
+
 from ..analyzers.codebase import CodebaseAnalyzer
-from ..utils.prompt_manager import PromptTemplate
-from ..utils.prompt_cache_manager import PromptCacheManager
 from ..utils.progress import ProgressTracker
+from ..utils.prompt_cache_manager import PromptCacheManager
+from ..utils.prompt_manager import PromptTemplate
 from ..utils.retry import async_retry
 from ..utils.tokens import TokenCounter
 
+# Local imports
+from .base_llm import BaseLLMClient
+from .llm_utils import (
+    find_common_dependencies,
+    fix_markdown_issues,
+    format_project_structure,
+    get_default_order,
+    identify_key_components,
+    prepare_file_order_data,
+    process_file_order_response,
+)
+from .message_manager import MessageManager
+
 # Constants
-DEFAULT_REGION = 'us-east-1'
-DEFAULT_MODEL_ID = 'us.anthropic.claude-sonnet-4-20250514-v1:0'
+DEFAULT_REGION = "us-east-1"
+DEFAULT_MODEL_ID = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 DEFAULT_MAX_TOKENS = 4096
 DEFAULT_TIMEOUT = 120
 DEFAULT_RETRIES = 3
@@ -60,11 +62,14 @@ DEFAULT_RETRY_DELAY = 1.0
 DEFAULT_TEMPERATURE = 0
 BEDROCK_API_VERSION = "bedrock-2023-05-31"
 
+
 class BedrockClientError(Exception):
     """Custom exception for Bedrock client errors."""
 
+
 class BedrockClient(BaseLLMClient):
     """Handles all interactions with AWS Bedrock."""
+
     def __init__(self, config: ScribeConfig):
         """
         Initialize the BedrockClient with the provided configuration.
@@ -85,8 +90,8 @@ class BedrockClient(BaseLLMClient):
         load_dotenv()
 
         # Use environment variables if available, otherwise use config
-        self.region = os.getenv('AWS_REGION') or config.bedrock.region
-        self.model_id = os.getenv('AWS_BEDROCK_MODEL_ID') or config.bedrock.model_id
+        self.region = os.getenv("AWS_REGION") or config.bedrock.region
+        self.model_id = os.getenv("AWS_BEDROCK_MODEL_ID") or config.bedrock.model_id
 
         # Print model ID for debugging
         if config.debug:
@@ -94,8 +99,12 @@ class BedrockClient(BaseLLMClient):
 
         # Set configuration properties
         self.max_tokens = config.bedrock.max_tokens
-        self.max_output_tokens_architecture = config.bedrock.max_output_tokens_architecture
-        self.max_output_tokens_persistence = config.bedrock.max_output_tokens_persistence
+        self.max_output_tokens_architecture = (
+            config.bedrock.max_output_tokens_architecture
+        )
+        self.max_output_tokens_persistence = (
+            config.bedrock.max_output_tokens_persistence
+        )
         self.retries = config.bedrock.retries
         self.retry_delay = config.bedrock.retry_delay
         self.timeout = config.bedrock.timeout
@@ -110,7 +119,9 @@ class BedrockClient(BaseLLMClient):
         self.enable_fallback = config.bedrock.enable_fallback
         self.throttling_retry_delay = config.bedrock.throttling_retry_delay
         self.throttling_max_retries = config.bedrock.throttling_max_retries
-        self.current_model_id = self.model_id  # Track which model is currently being used
+        self.current_model_id = (
+            self.model_id
+        )  # Track which model is currently being used
         self.throttling_retry_count = 0  # Track throttling retry attempts
 
         # Store large repository configuration
@@ -127,15 +138,15 @@ class BedrockClient(BaseLLMClient):
 
         # Get SSL verification setting from config or environment
         # Environment variable takes precedence over config
-        env_verify_ssl = os.getenv('AWS_VERIFY_SSL')
+        env_verify_ssl = os.getenv("AWS_VERIFY_SSL")
         if env_verify_ssl is not None:
-            self.verify_ssl = env_verify_ssl.lower() != 'false'
+            self.verify_ssl = env_verify_ssl.lower() != "false"
         else:
             self.verify_ssl = config.bedrock.verify_ssl
 
         # Set environment variable for tiktoken SSL verification to match our setting
         if not self.verify_ssl:
-            os.environ['TIKTOKEN_VERIFY_SSL'] = 'false'
+            os.environ["TIKTOKEN_VERIFY_SSL"] = "false"
             if self.debug:
                 print("SSL verification disabled for tiktoken")
         # Initialize Bedrock client
@@ -158,7 +169,7 @@ class BedrockClient(BaseLLMClient):
         # Initialize extended context configuration
         self.extended_context_enabled = config.bedrock.extended_context_enabled
         self.extended_context_beta_header = config.bedrock.extended_context_beta_header
-        
+
     def _initialize_bedrock_client(self) -> boto3.client:
         """
         Initialize the AWS Bedrock client with proper configuration.
@@ -168,18 +179,18 @@ class BedrockClient(BaseLLMClient):
         """
         # AWS SDK will automatically use AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from env
         return boto3.client(
-            'bedrock-runtime',
+            "bedrock-runtime",
             region_name=self.region,
             verify=self.verify_ssl,
             config=BotocoreConfig(
                 connect_timeout=self.timeout,
                 read_timeout=self.timeout,
-                retries={'max_attempts': self.retries},
+                retries={"max_attempts": self.retries},
                 max_pool_connections=max(self.concurrency, 10),
                 tcp_keepalive=True,
-            )
+            ),
         )
-    
+
     async def validate_aws_credentials(self) -> bool:
         """
         Validate that AWS credentials are properly configured.
@@ -189,26 +200,28 @@ class BedrockClient(BaseLLMClient):
         """
         try:
             # Try a simple operation to validate credentials
-            await asyncio.to_thread(
-                self.client.list_foundation_models
-            )
+            await asyncio.to_thread(self.client.list_foundation_models)
             logger = _get_logger()
             logger.info("AWS credentials validated successfully", emoji="aws")
             return True
         except botocore.exceptions.ClientError as e:
-            error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-            if error_code in ('UnrecognizedClientException', 'AccessDeniedException'):
+            error_code = e.response.get("Error", {}).get("Code", "Unknown")
+            if error_code in ("UnrecognizedClientException", "AccessDeniedException"):
                 logger = _get_logger()
-                logger.error(f"AWS credential validation failed: {error_code}", emoji="aws")
+                logger.error(
+                    f"AWS credential validation failed: {error_code}", emoji="aws"
+                )
                 if self.debug:
                     print(f"AWS credential error: {str(e)}")
                 return False
             # For other errors, credentials might be valid but other issues exist
             return True
         except Exception as e:
-            self.logger.warning(f"AWS credential validation error: {str(e)}", emoji="aws")
+            self.logger.warning(
+                f"AWS credential validation error: {str(e)}", emoji="aws"
+            )
             return False
-    
+
     async def initialize(self) -> None:
         """
         Perform async initialization tasks.
@@ -234,13 +247,17 @@ class BedrockClient(BaseLLMClient):
                 )
                 logger.info("Starting analysis...", emoji="analyze")
             else:
-                self.logger.info(f"Initialized with model: {self.model_id}", emoji="aws")
+                self.logger.info(
+                    f"Initialized with model: {self.model_id}", emoji="aws"
+                )
                 self.logger.info(f"Using AWS region: {self.region}", emoji="aws")
                 self.logger.info("Starting analysis...", emoji="start")
 
             if self.debug:
                 print(f"Selected model: {self.model_id}")
-                print(f"AWS credentials: {'Found' if os.getenv('AWS_ACCESS_KEY_ID') else 'Not found'} in environment")
+                print(
+                    f"AWS credentials: {'Found' if os.getenv('AWS_ACCESS_KEY_ID') else 'Not found'} in environment"
+                )
 
                 # Validate credentials
                 is_valid = await self.validate_aws_credentials()
@@ -258,7 +275,7 @@ class BedrockClient(BaseLLMClient):
             if self.debug:
                 print(f"Initialization error: {str(e)}")
             raise BedrockClientError(f"Failed to initialize client: {str(e)}")
-    
+
     def init_token_counter(self) -> None:
         """Initialize the token counter for this client."""
         self.token_counter = TokenCounter(model_name=self.model_id, debug=self.debug)
@@ -295,23 +312,26 @@ class BedrockClient(BaseLLMClient):
     async def close(self) -> None:
         """
         Clean up resources when the client is no longer needed.
-        
+
         This method should be called when you're done using the client to ensure
         proper cleanup of resources.
         """
         # Cancel any pending tasks
-        tasks = [task for task in asyncio.all_tasks()
-                if task is not asyncio.current_task() and not task.done()]
-        
+        tasks = [
+            task
+            for task in asyncio.all_tasks()
+            if task is not asyncio.current_task() and not task.done()
+        ]
+
         for task in tasks:
             task.cancel()
-            
+
         # Wait for tasks to be cancelled
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
 
         self.logger.info("BedrockClient resources cleaned up", emoji="success")
-    
+
     @async_retry(
         retries=3,
         delay=1.0,
@@ -320,7 +340,9 @@ class BedrockClient(BaseLLMClient):
         jitter=True,
         exceptions=(ConnectionError, TimeoutError),
     )
-    async def generate_summary(self, content: str, file_type: str = "text", file_path: str = None) -> Optional[str]:
+    async def generate_summary(
+        self, content: str, file_type: str = "text", file_path: str = None
+    ) -> Optional[str]:
         """Generate a summary for a file's content.
 
         Args:
@@ -334,7 +356,9 @@ class BedrockClient(BaseLLMClient):
         async with self.semaphore:  # Use semaphore to control concurrency
             try:
                 # Create a prompt that includes file information
-                file_info = f"File: {file_path}\nType: {file_type}\n\n" if file_path else ""
+                file_info = (
+                    f"File: {file_path}\nType: {file_type}\n\n" if file_path else ""
+                )
                 prompt = f"{file_info}{content}"
 
                 messages = MessageManager.get_file_summary_messages(prompt)
@@ -356,7 +380,9 @@ class BedrockClient(BaseLLMClient):
 
                     # Retry with more explicit prompt
                     retry_prompt = f"{prompt}\n\nIMPORTANT: Provide detailed code analysis following the template structure. Do NOT provide a confirmation message."
-                    retry_messages = MessageManager.get_file_summary_messages(retry_prompt)
+                    retry_messages = MessageManager.get_file_summary_messages(
+                        retry_prompt
+                    )
                     summary = await self._invoke_model_with_token_management(
                         retry_messages, log_cache_metrics=False, context=context
                     )
@@ -375,13 +401,13 @@ class BedrockClient(BaseLLMClient):
             except Exception as e:
                 self.logger.error(f"Error generating summary: {e}", emoji="error")
                 return None
-    
+
     # _update_progress method removed - now using ProgressTracker.update_progress_async
-    
+
     def _fix_markdown_issues(self, content: str) -> str:
         """Fix common markdown formatting issues before returning content."""
         return fix_markdown_issues(content)
-    
+
     @async_retry(
         retries=3,
         delay=1.0,
@@ -398,12 +424,14 @@ class BedrockClient(BaseLLMClient):
             with progress_tracker.progress_bar(
                 total=100,
                 desc="Generating project overview",
-                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
             ) as pbar:
                 try:
                     # Create progress update task
-                    update_task = asyncio.create_task(progress_tracker.update_progress_async(pbar))
-                    
+                    update_task = asyncio.create_task(
+                        progress_tracker.update_progress_async(pbar)
+                    )
+
                     # Get project name
                     logging.debug("Deriving project name...")
                     project_name = self._derive_project_name(file_manifest)
@@ -411,12 +439,14 @@ class BedrockClient(BaseLLMClient):
 
                     # Update progress
                     pbar.update(10)
-                    
+
                     # Get detected technologies
                     logging.debug("Finding common dependencies...")
                     try:
                         tech_report = self._find_common_dependencies(file_manifest)
-                        logging.debug(f"Dependencies found, report length: {len(tech_report)}")
+                        logging.debug(
+                            f"Dependencies found, report length: {len(tech_report)}"
+                        )
                     except Exception as e:
                         logging.error(f"Error in _find_common_dependencies: {str(e)}")
                         logging.error(f"Exception type: {type(e)}")
@@ -425,69 +455,77 @@ class BedrockClient(BaseLLMClient):
 
                     # Update progress
                     pbar.update(20)
-                    
+
                     # Get key components
                     logging.debug("Identifying key components...")
                     try:
                         key_components = self._identify_key_components(file_manifest)
-                        logging.debug(f"Key components identified, report length: {len(key_components)}")
+                        logging.debug(
+                            f"Key components identified, report length: {len(key_components)}"
+                        )
                     except Exception as e:
                         logging.error(f"Error in _identify_key_components: {str(e)}")
                         logging.error(f"Exception type: {type(e)}")
                         logging.error(f"Exception traceback: {traceback.format_exc()}")
                         key_components = "No key components identified."
-                    
+
                     # Update progress
                     pbar.update(30)
 
                     # Get template content
-                    template_content = self.prompt_template.get_template("project_overview").format(
+                    template_content = self.prompt_template.get_template(
+                        "project_overview"
+                    ).format(
                         project_name=project_name,
                         file_count=len(file_manifest),
                         key_components=key_components,
-                        dependencies=tech_report
+                        dependencies=tech_report,
                     )
 
                     # Update progress
                     pbar.update(40)
-                    
+
                     # Get messages
                     messages = MessageManager.get_project_overview_messages(
-                        self.project_structure,
-                        tech_report,
-                        template_content
+                        self.project_structure, tech_report, template_content
                     )
-                    
+
                     # Update progress
                     pbar.update(50)
-                    
+
                     # Check token limits and truncate if needed
                     if self.token_counter:
                         messages = MessageManager.check_and_truncate_messages(
-                            messages,
-                            self.token_counter,
-                            self.model_id
+                            messages, self.token_counter, self.model_id
                         )
 
                     # Update progress
                     pbar.update(60)
-                    
+
                     # Extract system and user content
-                    system_content = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
-                    user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
-                    
+                    system_content = next(
+                        (msg["content"] for msg in messages if msg["role"] == "system"),
+                        "",
+                    )
+                    user_content = next(
+                        (msg["content"] for msg in messages if msg["role"] == "user"),
+                        "",
+                    )
+
                     # Use the helper method to create and invoke the request
-                    content = await self._create_and_invoke_bedrock_request(system_content, user_content)
-                    
+                    content = await self._create_and_invoke_bedrock_request(
+                        system_content, user_content
+                    )
+
                     # Update progress
                     pbar.update(70)
-                    
+
                     # Fix any markdown issues
                     fixed_content = self._fix_markdown_issues(content)
 
                     # Update progress
                     pbar.update(80)
-                    
+
                     return fixed_content
                 except Exception as e:
                     if self.debug:
@@ -500,7 +538,7 @@ class BedrockClient(BaseLLMClient):
                     # Update progress
                     pbar.update(90)
                     # Cancel progress update task
-                    if 'update_task' in locals():
+                    if "update_task" in locals():
                         update_task.cancel()
         except Exception as e:
             if self.debug:
@@ -508,50 +546,64 @@ class BedrockClient(BaseLLMClient):
             logging.error(f"Error in generate_project_overview setup: {e}")
             return f"This is a software project containing {len(file_manifest)} files."
             raise
-    def _format_project_structure(self, file_manifest: dict, force_compression: Optional[bool] = None) -> str:
+
+    def _format_project_structure(
+        self, file_manifest: dict, force_compression: Optional[bool] = None
+    ) -> str:
         """Build a tree-like project structure string."""
         try:
-            result = format_project_structure(file_manifest, self.debug, force_compression)
+            result = format_project_structure(
+                file_manifest, self.debug, force_compression
+            )
             # Ensure result is a string
             if not isinstance(result, str):
-                logging.warning(f"format_project_structure returned non-string: {type(result)}")
+                logging.warning(
+                    f"format_project_structure returned non-string: {type(result)}"
+                )
                 return "Project structure not available."
             return result
         except Exception as e:
             logging.error(f"Error in _format_project_structure: {e}")
             return "Project structure not available."
+
     def _find_common_dependencies(self, file_manifest: dict) -> str:
         """Extract common dependencies from file manifest."""
         try:
             # Log detailed information about file_manifest
-            logging.debug(f"_find_common_dependencies called with file_manifest type: {type(file_manifest)}")
+            logging.debug(
+                f"_find_common_dependencies called with file_manifest type: {type(file_manifest)}"
+            )
             if file_manifest:
                 sample_key = next(iter(file_manifest))
                 sample_value = file_manifest[sample_key]
-                logging.debug(f"Sample key type: {type(sample_key)}, value: {sample_key}")
+                logging.debug(
+                    f"Sample key type: {type(sample_key)}, value: {sample_key}"
+                )
                 logging.debug(f"Sample value type: {type(sample_value)}")
-                if hasattr(sample_value, '__dict__'):
+                if hasattr(sample_value, "__dict__"):
                     logging.debug(f"Sample value attributes: {dir(sample_value)}")
                 elif isinstance(sample_value, dict):
                     logging.debug(f"Sample value keys: {sample_value.keys()}")
             else:
                 logging.debug("file_manifest is empty")
-            
+
             # Convert file_manifest if needed
             # If file_manifest contains FileInfo objects but find_common_dependencies expects dicts
             converted_manifest = {}
             for path, info in file_manifest.items():
-                if hasattr(info, 'to_dict'):
+                if hasattr(info, "to_dict"):
                     # Convert FileInfo to dict if needed
                     converted_manifest[path] = info.to_dict()
                 else:
                     # Keep as is
                     converted_manifest[path] = info
-            
+
             result = find_common_dependencies(converted_manifest, self.debug)
             # Ensure result is a string
             if not isinstance(result, str):
-                logging.warning(f"find_common_dependencies returned non-string: {type(result)}")
+                logging.warning(
+                    f"find_common_dependencies returned non-string: {type(result)}"
+                )
                 return "No dependencies detected."
             return result
         except Exception as e:
@@ -584,121 +636,124 @@ class BedrockClient(BaseLLMClient):
             # If file_manifest contains FileInfo objects but identify_key_components expects dicts
             converted_manifest = {}
             for path, info in file_manifest.items():
-                if hasattr(info, 'to_dict'):
+                if hasattr(info, "to_dict"):
                     # Convert FileInfo to dict if needed
                     converted_manifest[path] = info.to_dict()
                 else:
                     # Keep as is
                     converted_manifest[path] = info
-            
+
             result = identify_key_components(converted_manifest, self.debug)
             # Ensure result is a string
             if not isinstance(result, str):
-                logging.warning(f"identify_key_components returned non-string: {type(result)}")
+                logging.warning(
+                    f"identify_key_components returned non-string: {type(result)}"
+                )
                 return "No key components identified."
             return result
         except Exception as e:
             logging.error(f"Error in _identify_key_components: {e}")
             return "No key components identified."
-    
+
     def _derive_project_name(self, file_manifest: dict) -> str:
         """Derive project name from repository structure."""
         try:
             # Create a temporary analyzer instance to use its method
             from src.utils.config_class import ScribeConfig
+
             config = ScribeConfig()
             config.debug = self.debug
             temp_analyzer = CodebaseAnalyzer(Path("."), config)
             temp_analyzer.file_manifest = file_manifest
-            
+
             result = temp_analyzer.derive_project_name(self.debug)
-            
+
             # Ensure result is a string
             if not isinstance(result, str) or not result.strip():
-                logging.warning(f"derive_project_name returned invalid result: {result}")
+                logging.warning(
+                    f"derive_project_name returned invalid result: {result}"
+                )
                 return "Unknown Project"
-                
+
             return result
         except Exception as e:
             logging.error(f"Error in _derive_project_name: {e}")
             return "Unknown Project"
-    
+
     def set_project_structure(self, structure: str) -> None:
         """
         Set the project structure for use in prompts.
-        
+
         Args:
             structure: String representation of the project structure
         """
         self.project_structure = structure
         if self.debug:
             print(f"Project structure set ({len(structure)} chars)")
-            
-    def set_project_structure_from_manifest(self, file_manifest: Dict[str, Any]) -> None:
+
+    def set_project_structure_from_manifest(
+        self, file_manifest: Dict[str, Any]
+    ) -> None:
         """
         Set the project structure from a file manifest.
-        
+
         This is a convenience method that formats the file manifest into a
         string representation and then sets it as the project structure.
-        
+
         Args:
             file_manifest: Dictionary mapping file paths to file information
         """
         self.project_structure = self._format_project_structure(file_manifest)
-    
+
     async def _create_and_invoke_bedrock_request(
-        self,
-        system_content: str,
-        user_content: str,
-        max_tokens: Optional[int] = None
+        self, system_content: str, user_content: str, max_tokens: Optional[int] = None
     ) -> str:
         """
         Helper method to create and invoke a Bedrock request with the given content.
-        
+
         Args:
             system_content: System message content
             user_content: User message content
             max_tokens: Maximum tokens to generate (uses default if None)
-            
+
         Returns:
             str: The generated content with markdown issues fixed
-            
+
         Raises:
             Various exceptions from the underlying API call
         """
         # Combine for Claude
         combined_content = f"{system_content}\n\n{user_content}"
-        
+
         # Create proper Bedrock format
         bedrock_messages = [
-            {
-                "role": "user",
-                "content": [{"type": "text", "text": combined_content}]
-            }
+            {"role": "user", "content": [{"type": "text", "text": combined_content}]}
         ]
-        
+
         # Use provided max_tokens or default
         tokens_to_generate = max_tokens or self.max_tokens
-        
+
         # Invoke model
         response = await asyncio.to_thread(
             self.client.invoke_model,
-            body=json.dumps({
-                "anthropic_version": BEDROCK_API_VERSION,
-                "max_tokens": tokens_to_generate,
-                "messages": bedrock_messages,
-                "temperature": self.temperature
-            }),
-            modelId=self.model_id
+            body=json.dumps(
+                {
+                    "anthropic_version": BEDROCK_API_VERSION,
+                    "max_tokens": tokens_to_generate,
+                    "messages": bedrock_messages,
+                    "temperature": self.temperature,
+                }
+            ),
+            modelId=self.model_id,
         )
-        
+
         # Process response
-        response_body = json.loads(response.get('body').read())
-        content = response_body['content'][0]['text']
-        
+        response_body = json.loads(response.get("body").read())
+        content = response_body["content"][0]["text"]
+
         # Fix any markdown issues
         return self._fix_markdown_issues(content)
-    
+
     @async_retry(
         retries=3,
         delay=1.0,
@@ -714,85 +769,99 @@ class BedrockClient(BaseLLMClient):
             progress_tracker = ProgressTracker.get_instance(Path("."))
             with progress_tracker.progress_bar(
                 desc="Generating architecture documentation",
-                bar_format='{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}',
-                ncols=150
+                bar_format="{desc} {percentage:3.0f}%|{bar}| {n_fmt}/{total_fmt}",
+                ncols=150,
             ) as pbar:
                 try:
-                    update_task = asyncio.create_task(progress_tracker.update_progress_async(pbar))
-                    
+                    update_task = asyncio.create_task(
+                        progress_tracker.update_progress_async(pbar)
+                    )
+
                     # Ensure project structure is set
                     if not self.project_structure or len(self.project_structure) < 10:
                         self.set_project_structure_from_manifest(file_manifest)
                         if self.debug:
-                            print(f"Project structure generated ({len(self.project_structure)} chars)")
-                    
+                            print(
+                                f"Project structure generated ({len(self.project_structure)} chars)"
+                            )
+
                     # Get detected technologies
                     tech_report = self._find_common_dependencies(file_manifest)
-                    
+
                     # Get key components
                     key_components = self._identify_key_components(file_manifest)
-                    
+
                     # Create a summary of file contents for context
                     file_summaries = []
-                    
+
                     # First, categorize files by directory/component
                     file_by_component = {}
                     for path, info in file_manifest.items():
-                        if info.get('summary') and not info.get('is_binary', False):
+                        if info.get("summary") and not info.get("is_binary", False):
                             directory = str(Path(path).parent)
                             if directory not in file_by_component:
                                 file_by_component[directory] = []
-                            file_by_component[directory].append((path, info.get('summary', 'No summary available')))
-                    
+                            file_by_component[directory].append(
+                                (path, info.get("summary", "No summary available"))
+                            )
+
                     # For each component, include a representative sample of files
                     for directory, files in file_by_component.items():
                         # Add component header
                         file_summaries.append(f"## Component: {directory}")
-                        
+
                         # Sort files by potential importance (e.g., longer summaries might be more important)
                         files.sort(key=lambda x: len(x[1]), reverse=True)
-                        
+
                         # Take up to 3 files per component to ensure broad coverage
                         for path, summary in files[:3]:
                             file_summaries.append(f"File: {path}\nSummary: {summary}")
-                    
+
                     file_summaries_text = "\n\n".join(file_summaries)
-                    
+
                     # Get messages from MessageManager
                     messages = MessageManager.get_architecture_content_messages(
-                        self.project_structure, 
-                        key_components,
-                        tech_report
+                        self.project_structure, key_components, tech_report
                     )
-                    
+
                     # Add file summaries to the user message
                     for i, msg in enumerate(messages):
                         if msg["role"] == "user":
-                            messages[i]["content"] += f"\n\nFile Summaries:\n{file_summaries_text}"
+                            messages[i][
+                                "content"
+                            ] += f"\n\nFile Summaries:\n{file_summaries_text}"
                             break
-                    
+
                     # Extract system and user content
-                    system_content = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
-                    user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
-                    
+                    system_content = next(
+                        (msg["content"] for msg in messages if msg["role"] == "system"),
+                        "",
+                    )
+                    user_content = next(
+                        (msg["content"] for msg in messages if msg["role"] == "user"),
+                        "",
+                    )
+
                     # Use the helper method to create and invoke the request
-                    content = await self._create_and_invoke_bedrock_request(system_content, user_content)
-                    
+                    content = await self._create_and_invoke_bedrock_request(
+                        system_content, user_content
+                    )
+
                     update_task.cancel()
-                    
+
                     # Ensure the project structure is included in the output
                     if "```" not in content[:500]:
                         content = f"# Architecture Documentation\n\n## Project Structure\n```\n{self.project_structure}\n```\n\n{content}"
-                    
+
                     # Fix any remaining markdown issues
                     fixed_content = self._fix_markdown_issues(content)
                     return fixed_content
-                    
+
                 except Exception as e:
                     if self.debug:
                         print(f"\nError generating architecture content: {str(e)}")
                     return "Error generating architecture documentation."
-    
+
     @async_retry(
         retries=3,
         delay=1.0,
@@ -809,56 +878,67 @@ class BedrockClient(BaseLLMClient):
             with progress_tracker.progress_bar(
                 total=100,
                 desc="Generating architecture documentation",
-                bar_format='{l_bar}{bar}| {n_fmt}/{total_fmt}'
+                bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt}",
             ) as pbar:
                 # Create progress update task
-                update_task = asyncio.create_task(progress_tracker.update_progress_async(pbar))
-                
+                update_task = asyncio.create_task(
+                    progress_tracker.update_progress_async(pbar)
+                )
+
                 # Get project name
-                project_name = self._derive_project_name(file_manifest)
-                
+                _ = self._derive_project_name(file_manifest)
+
                 # Get detected technologies
                 tech_report = self._find_common_dependencies(file_manifest)
-                
+
                 # Get key components
                 key_components = self._identify_key_components(file_manifest)
-                
+
                 # Format project structure without compression for architecture documentation
-                self.project_structure = self._format_project_structure(file_manifest, force_compression=False)
-                
+                self.project_structure = self._format_project_structure(
+                    file_manifest, force_compression=False
+                )
+
                 # Get messages
                 messages = MessageManager.get_architecture_content_messages(
-                    self.project_structure,
-                    key_components,
-                    tech_report
+                    self.project_structure, key_components, tech_report
                 )
-                
+
                 # Update progress
                 pbar.update(20)
-                
+
                 try:
                     content = await self._invoke_model_with_token_management(messages)
-                    
+
                     # Update progress
                     pbar.update(70)
-                    
+
                     # Cancel progress update task
                     update_task.cancel()
-                    
+
                     logging.info("Successfully received architecture content from LLM")
                     return content
-                
+
                 except botocore.exceptions.ClientError as e:
                     # Cancel progress update task
                     update_task.cancel()
-                    
-                    error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-                    error_message = e.response.get('Error', {}).get('Message', str(e))
-                    
-                    if error_code in ['UnrecognizedClientException', 'InvalidSignatureException', 'SignatureDoesNotMatch', 'ExpiredToken']:
-                        logging.error(f"AWS authentication error: {error_code} - {error_message}")
-                        logging.error("Please check your AWS credentials and ensure they are valid and not expired.")
-                        
+
+                    error_code = e.response.get("Error", {}).get("Code", "Unknown")
+                    error_message = e.response.get("Error", {}).get("Message", str(e))
+
+                    if error_code in [
+                        "UnrecognizedClientException",
+                        "InvalidSignatureException",
+                        "SignatureDoesNotMatch",
+                        "ExpiredToken",
+                    ]:
+                        logging.error(
+                            f"AWS authentication error: {error_code} - {error_message}"
+                        )
+                        logging.error(
+                            "Please check your AWS credentials and ensure they are valid and not expired."
+                        )
+
                         # Return a more helpful error message
                         return (
                             "# Architecture Documentation\n\n"
@@ -870,29 +950,31 @@ class BedrockClient(BaseLLMClient):
                             "3. Try using a different LLM provider with `--llm-provider ollama`\n"
                         )
                     else:
-                        logging.error(f"Error in LLM architecture generation: {error_code} - {error_message}")
+                        logging.error(
+                            f"Error in LLM architecture generation: {error_code} - {error_message}"
+                        )
                         logging.error(f"Exception details: {traceback.format_exc()}")
-                        
+
                         # Return a fallback message
                         return "# Architecture Documentation\n\nUnable to generate architecture documentation due to an error."
-                
+
                 except Exception as e:
                     # Cancel progress update task
                     update_task.cancel()
-                    
+
                     logging.error(f"Error in LLM architecture generation: {str(e)}")
                     logging.error(f"Exception details: {traceback.format_exc()}")
-                    
+
                     # Return a fallback message
                     return "# Architecture Documentation\n\nUnable to generate architecture documentation due to an error."
-                
+
         except Exception as e:
             if self.debug:
                 print(f"\nError generating architecture documentation: {str(e)}")
             logging.error(f"Error in LLM architecture generation: {str(e)}")
             logging.error(f"Exception details: {traceback.format_exc()}")
             return "# Architecture Documentation\n\nUnable to generate architecture documentation due to an error."
-    
+
     @async_retry(
         retries=3,
         delay=1.0,
@@ -907,22 +989,21 @@ class BedrockClient(BaseLLMClient):
             try:
                 # Get detected technologies
                 tech_report = self._find_common_dependencies(file_manifest)
-                
+
                 # Get messages from MessageManager
                 messages = MessageManager.get_component_relationship_messages(
-                    self.project_structure, 
-                    tech_report
+                    self.project_structure, tech_report
                 )
-                
+
                 # Use the new token-aware invocation method
                 content = await self._invoke_model_with_token_management(messages)
                 return content
-                
+
             except Exception as e:
                 if self.debug:
                     print(f"\nError generating component relationships: {str(e)}")
                 return "# Component Relationships\n\nUnable to generate component relationships due to an error."
-    
+
     @async_retry(
         retries=3,
         delay=1.0,
@@ -931,45 +1012,46 @@ class BedrockClient(BaseLLMClient):
         jitter=True,
         exceptions=(botocore.exceptions.ClientError, ConnectionError, TimeoutError),
     )
-    async def enhance_documentation(self, existing_content: str, file_manifest: dict, doc_type: str) -> str:
+    async def enhance_documentation(
+        self, existing_content: str, file_manifest: dict, doc_type: str
+    ) -> str:
         """Enhance existing documentation with new insights."""
         try:
             # Get detected technologies
             tech_report = self._find_common_dependencies(file_manifest)
-            
+
             # Get key components
             key_components = self._identify_key_components(file_manifest)
-            
+
             # Ensure project structure is set
             if not self.project_structure or len(self.project_structure) < 10:
                 self.set_project_structure_from_manifest(file_manifest)
                 if self.debug:
-                    print(f"Project structure generated ({len(self.project_structure)} chars)")
-            
+                    print(
+                        f"Project structure generated ({len(self.project_structure)} chars)"
+                    )
+
             # Create context for template
-            context = {
-                "doc_type": doc_type,
-                "existing_content": existing_content
-            }
-            
+            context = {"doc_type": doc_type, "existing_content": existing_content}
+
             # Get template content with context
-            template_content = self.prompt_template.get_template("enhance_documentation", context)
-            
+            _ = self.prompt_template.get_template("enhance_documentation", context)
+
             # Get messages
             messages = MessageManager.get_enhance_documentation_messages(
                 existing_content,
                 self.project_structure,
                 key_components,
                 tech_report,
-                doc_type
+                doc_type,
             )
-            
+
             # Use the token-aware invocation method
             content = await self._invoke_model_with_token_management(messages)
-            
+
             # Fix any markdown issues
             return self._fix_markdown_issues(content)
-            
+
         except Exception as e:
             if self.debug:
                 print(f"\nError enhancing documentation: {str(e)}")
@@ -987,10 +1069,10 @@ class BedrockClient(BaseLLMClient):
     async def generate_usage_guide(self, file_manifest: dict) -> str:
         """
         Generate usage guide based on project structure.
-        
+
         Args:
             file_manifest: Dictionary mapping file paths to file information
-            
+
         Returns:
             str: Generated usage guide content in markdown format
         """
@@ -999,16 +1081,22 @@ class BedrockClient(BaseLLMClient):
                 # Get messages from MessageManager
                 messages = MessageManager.get_usage_guide_messages(
                     self.project_structure,
-                    self._find_common_dependencies(file_manifest)
+                    self._find_common_dependencies(file_manifest),
                 )
-                
+
                 # Extract system and user content
-                system_content = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
-                user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
-                
+                system_content = next(
+                    (msg["content"] for msg in messages if msg["role"] == "system"), ""
+                )
+                user_content = next(
+                    (msg["content"] for msg in messages if msg["role"] == "user"), ""
+                )
+
                 # Use the helper method to create and invoke the request
-                return await self._create_and_invoke_bedrock_request(system_content, user_content)
-                
+                return await self._create_and_invoke_bedrock_request(
+                    system_content, user_content
+                )
+
             except Exception as e:
                 if self.debug:
                     print(f"\nError generating usage guide: {str(e)}")
@@ -1026,10 +1114,10 @@ class BedrockClient(BaseLLMClient):
     async def generate_contributing_guide(self, file_manifest: dict) -> str:
         """
         Generate contributing guide based on project structure.
-        
+
         Args:
             file_manifest: Dictionary mapping file paths to file information
-            
+
         Returns:
             str: Generated contributing guide content in markdown format
         """
@@ -1039,14 +1127,20 @@ class BedrockClient(BaseLLMClient):
                 messages = MessageManager.get_contributing_guide_messages(
                     self.project_structure
                 )
-                
+
                 # Extract system and user content
-                system_content = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
-                user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
-                
+                system_content = next(
+                    (msg["content"] for msg in messages if msg["role"] == "system"), ""
+                )
+                user_content = next(
+                    (msg["content"] for msg in messages if msg["role"] == "user"), ""
+                )
+
                 # Use the helper method to create and invoke the request
-                return await self._create_and_invoke_bedrock_request(system_content, user_content)
-                
+                return await self._create_and_invoke_bedrock_request(
+                    system_content, user_content
+                )
+
             except Exception as e:
                 if self.debug:
                     print(f"\nError generating contributing guide: {str(e)}")
@@ -1064,10 +1158,10 @@ class BedrockClient(BaseLLMClient):
     async def generate_license_info(self, file_manifest: dict) -> str:
         """
         Generate license information based on project structure.
-        
+
         Args:
             file_manifest: Dictionary mapping file paths to file information
-            
+
         Returns:
             str: Generated license information content in markdown format
         """
@@ -1077,14 +1171,20 @@ class BedrockClient(BaseLLMClient):
                 messages = MessageManager.get_license_info_messages(
                     self.project_structure
                 )
-                
+
                 # Extract system and user content
-                system_content = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
-                user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
-                
+                system_content = next(
+                    (msg["content"] for msg in messages if msg["role"] == "system"), ""
+                )
+                user_content = next(
+                    (msg["content"] for msg in messages if msg["role"] == "user"), ""
+                )
+
                 # Use the helper method to create and invoke the request
-                return await self._create_and_invoke_bedrock_request(system_content, user_content)
-                
+                return await self._create_and_invoke_bedrock_request(
+                    system_content, user_content
+                )
+
             except Exception as e:
                 if self.debug:
                     print(f"\nError generating license info: {str(e)}")
@@ -1118,7 +1218,7 @@ class BedrockClient(BaseLLMClient):
 
                 # Get messages from MessageManager
                 # Use get_installation_guide_messages if available, otherwise construct manually
-                if hasattr(MessageManager, 'get_installation_guide_messages'):
+                if hasattr(MessageManager, "get_installation_guide_messages"):
                     messages = MessageManager.get_installation_guide_messages(
                         project_structure_cached, tech_report
                     )
@@ -1126,7 +1226,7 @@ class BedrockClient(BaseLLMClient):
                     messages = [
                         {
                             "role": "system",
-                            "content": "You are a technical documentation expert. Generate comprehensive installation documentation."
+                            "content": "You are a technical documentation expert. Generate comprehensive installation documentation.",
                         },
                         {
                             "role": "user",
@@ -1147,8 +1247,8 @@ Include:
 4. Verification steps
 5. Common installation issues and solutions
 
-Use proper markdown formatting."""
-                        }
+Use proper markdown formatting.""",
+                        },
                     ]
 
                 # Use the token management method that supports caching
@@ -1190,7 +1290,7 @@ Use proper markdown formatting."""
                 )
 
                 # Get messages from MessageManager
-                if hasattr(MessageManager, 'get_troubleshooting_guide_messages'):
+                if hasattr(MessageManager, "get_troubleshooting_guide_messages"):
                     messages = MessageManager.get_troubleshooting_guide_messages(
                         project_structure_cached, tech_report
                     )
@@ -1198,7 +1298,7 @@ Use proper markdown formatting."""
                     messages = [
                         {
                             "role": "system",
-                            "content": "You are a technical documentation expert. Generate comprehensive troubleshooting documentation."
+                            "content": "You are a technical documentation expert. Generate comprehensive troubleshooting documentation.",
                         },
                         {
                             "role": "user",
@@ -1220,8 +1320,8 @@ Include:
 5. Environment-specific issues
 6. FAQ section
 
-Use proper markdown formatting."""
-                        }
+Use proper markdown formatting.""",
+                        },
                     ]
 
                 # Use the token management method that supports caching
@@ -1288,15 +1388,17 @@ Use proper markdown formatting."""
                     "Part 1/3: Generating overview and schema statistics",
                     emoji="document",
                 )
-                if hasattr(MessageManager, 'get_persistence_overview_messages'):
-                    overview_messages = MessageManager.get_persistence_overview_messages(
-                        self.project_structure, persistence_info
+                if hasattr(MessageManager, "get_persistence_overview_messages"):
+                    overview_messages = (
+                        MessageManager.get_persistence_overview_messages(
+                            self.project_structure, persistence_info
+                        )
                     )
                 else:
                     overview_messages = [
                         {
                             "role": "system",
-                            "content": "You are a database documentation expert."
+                            "content": "You are a database documentation expert.",
                         },
                         {
                             "role": "user",
@@ -1309,8 +1411,8 @@ Provide an overview including:
 1. Database technology used
 2. Schema statistics
 3. Key design patterns observed
-4. Data model overview"""
-                        }
+4. Data model overview""",
+                        },
                     ]
                 overview_content = await self._invoke_model_with_token_management(
                     overview_messages, max_tokens=4096
@@ -1337,16 +1439,21 @@ Provide an overview including:
                         f"Processing table batch {batch_num}/{len(table_batches)} ({len(table_batch)} tables)",
                         emoji="processing",
                     )
-                    if hasattr(MessageManager, 'get_persistence_tables_batch_messages'):
-                        batch_messages = MessageManager.get_persistence_tables_batch_messages(
-                            self.project_structure, table_batch, batch_num, len(table_batches)
+                    if hasattr(MessageManager, "get_persistence_tables_batch_messages"):
+                        batch_messages = (
+                            MessageManager.get_persistence_tables_batch_messages(
+                                self.project_structure,
+                                table_batch,
+                                batch_num,
+                                len(table_batches),
+                            )
                         )
                     else:
                         table_info = json.dumps(table_batch, indent=2, default=str)
                         batch_messages = [
                             {
                                 "role": "system",
-                                "content": "You are a database documentation expert."
+                                "content": "You are a database documentation expert.",
                             },
                             {
                                 "role": "user",
@@ -1358,8 +1465,8 @@ For each table provide:
 1. Table purpose and description
 2. Column documentation
 3. Constraints and indexes
-4. Usage patterns"""
-                            }
+4. Usage patterns""",
+                            },
                         ]
                     batch_content = await self._invoke_model_with_token_management(
                         batch_messages, max_tokens=self.max_output_tokens_persistence
@@ -1379,16 +1486,20 @@ For each table provide:
                     if len(tables) > 20:
                         tables_summary += f" (and {len(tables) - 20} more)"
 
-                    if hasattr(MessageManager, 'get_persistence_relationships_messages'):
-                        rel_messages = MessageManager.get_persistence_relationships_messages(
-                            self.project_structure, relationships, tables_summary
+                    if hasattr(
+                        MessageManager, "get_persistence_relationships_messages"
+                    ):
+                        rel_messages = (
+                            MessageManager.get_persistence_relationships_messages(
+                                self.project_structure, relationships, tables_summary
+                            )
                         )
                     else:
                         rel_info = json.dumps(relationships, indent=2, default=str)
                         rel_messages = [
                             {
                                 "role": "system",
-                                "content": "You are a database documentation expert."
+                                "content": "You are a database documentation expert.",
                             },
                             {
                                 "role": "user",
@@ -1402,11 +1513,13 @@ Relationships:
 Include:
 1. Relationship descriptions
 2. Mermaid ER diagram
-3. Data flow patterns"""
-                            }
+3. Data flow patterns""",
+                            },
                         ]
-                    relationships_content = await self._invoke_model_with_token_management(
-                        rel_messages, max_tokens=8192
+                    relationships_content = (
+                        await self._invoke_model_with_token_management(
+                            rel_messages, max_tokens=8192
+                        )
                     )
                 else:
                     self.logger.info(
@@ -1450,36 +1563,48 @@ Include:
     async def get_file_order(self, project_files: dict) -> list[str]:
         """
         Ask LLM to determine optimal file processing order.
-        
+
         Args:
             project_files: Dictionary mapping file paths to file information
-            
+
         Returns:
             list[str]: Ordered list of file paths
         """
         try:
             print("\nStarting file order optimization...")
             logging.info("Preparing file order optimization request")
-            
+
             # Use common utility to prepare data
-            core_files, resource_files, files_info = prepare_file_order_data(project_files, self.debug)
-            
+            core_files, resource_files, files_info = prepare_file_order_data(
+                project_files, self.debug
+            )
+
             print(f"Sending request to LLM with {len(files_info)} files...")
-            logging.info(f"Sending file order request to LLM with {len(files_info)} files")
-            
+            logging.info(
+                f"Sending file order request to LLM with {len(files_info)} files"
+            )
+
             # Get messages from MessageManager
             messages = MessageManager.get_file_order_messages(files_info)
-            
+
             # Extract system and user content
-            system_content = next((msg["content"] for msg in messages if msg["role"] == "system"), "")
-            user_content = next((msg["content"] for msg in messages if msg["role"] == "user"), "")
-            
+            system_content = next(
+                (msg["content"] for msg in messages if msg["role"] == "system"), ""
+            )
+            user_content = next(
+                (msg["content"] for msg in messages if msg["role"] == "user"), ""
+            )
+
             # Use the helper method to create and invoke the request
-            content = await self._create_and_invoke_bedrock_request(system_content, user_content)
-            
+            content = await self._create_and_invoke_bedrock_request(
+                system_content, user_content
+            )
+
             # Use common utility to process response
-            return process_file_order_response(content, core_files, resource_files, self.debug)
-        
+            return process_file_order_response(
+                content, core_files, resource_files, self.debug
+            )
+
         except Exception as e:
             print(f"Error in file order optimization: {str(e)}")
             logging.error(f"Error getting file order: {str(e)}", exc_info=True)
@@ -1904,8 +2029,8 @@ Include:
                 )
 
                 # Process response
-                response_body = json.loads(response.get('body').read())
-                content = response_body['content'][0]['text']
+                response_body = json.loads(response.get("body").read())
+                content = response_body["content"][0]["text"]
 
                 # Fix any markdown issues
                 fixed_content = self._fix_markdown_issues(content)
@@ -1916,11 +2041,13 @@ Include:
                 self.logger.error(
                     f"Request timed out after {self.timeout} seconds", emoji="timer"
                 )
-                raise TimeoutError(f"Bedrock API call timed out after {self.timeout} seconds")
+                raise TimeoutError(
+                    f"Bedrock API call timed out after {self.timeout} seconds"
+                )
 
             except botocore.exceptions.ClientError as e:
-                error_code = e.response.get('Error', {}).get('Code', 'Unknown')
-                error_message = e.response.get('Error', {}).get('Message', str(e))
+                error_code = e.response.get("Error", {}).get("Code", "Unknown")
+                error_message = e.response.get("Error", {}).get("Message", str(e))
                 self.logger.error(
                     f"Bedrock API error: {error_code} - {error_message}", emoji="aws"
                 )
@@ -1969,8 +2096,8 @@ Include:
                 # Handle "Input is too long" error with emergency truncation
                 if (
                     retry_on_token_error
-                    and error_code == 'ValidationException'
-                    and 'Input is too long' in error_message
+                    and error_code == "ValidationException"
+                    and "Input is too long" in error_message
                 ):
                     self.logger.warning(
                         "Input too long error detected, attempting emergency truncation",
@@ -1982,15 +2109,20 @@ Include:
                         emergency_content = self.token_counter.truncate_text(
                             combined_content, max_emergency_tokens
                         )
-                        emergency_tokens = self.token_counter.count_tokens(emergency_content)
+                        emergency_tokens = self.token_counter.count_tokens(
+                            emergency_content
+                        )
                         self.logger.info(
                             f"Emergency truncation to {emergency_tokens} tokens (50% of limit)",
                             emoji="processing",
                         )
 
                         emergency_messages = [
-                            {"role": "system", "content": "Provide a concise response due to input length constraints."},
-                            {"role": "user", "content": emergency_content}
+                            {
+                                "role": "system",
+                                "content": "Provide a concise response due to input length constraints.",
+                            },
+                            {"role": "user", "content": emergency_content},
                         ]
 
                         return await self._invoke_model_with_token_management(
@@ -2071,7 +2203,7 @@ Your response must be parseable by json.loads() function directly."""
 
                 if adjusted_total_tokens + tokens_to_generate > model_limit:
                     self.logger.warning(
-                        f"JSON invocation token limit exceeded: reducing input tokens",
+                        "JSON invocation token limit exceeded: reducing input tokens",
                         emoji="token",
                     )
                     target_tokens = (effective_input_limit / safety_factor) * 0.95
@@ -2375,7 +2507,12 @@ Your response must be parseable by json.loads() function directly."""
             elif line.startswith("File:") and any(
                 keyword in line.lower()
                 for keyword in [
-                    "controller", "service", "config", "main", "app", "index",
+                    "controller",
+                    "service",
+                    "config",
+                    "main",
+                    "app",
+                    "index",
                 ]
             ):
                 if current_section:
@@ -2404,7 +2541,10 @@ Your response must be parseable by json.loads() function directly."""
             elif any(
                 keyword in line.lower()
                 for keyword in [
-                    "project structure", "dependencies", "technology", "architecture",
+                    "project structure",
+                    "dependencies",
+                    "technology",
+                    "architecture",
                 ]
             ):
                 if current_section:

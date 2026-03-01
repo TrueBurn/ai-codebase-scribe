@@ -1,11 +1,11 @@
-import unittest
-from unittest.mock import AsyncMock, MagicMock, patch
-import sys
 import os
-from typing import Dict, Any, Optional, List
+import sys
+import unittest
+from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock, MagicMock, patch
 
 # Add the src directory to the Python path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.clients.base_llm import BaseLLMClient
 
@@ -15,6 +15,7 @@ class TestBaseLLMClient(unittest.TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
+
         # Create a concrete implementation of BaseLLMClient for testing
         class ConcreteLLMClient(BaseLLMClient):
             async def initialize(self) -> None:
@@ -26,46 +27,94 @@ class TestBaseLLMClient(unittest.TestCase):
             async def generate_summary(self, prompt: str) -> Optional[str]:
                 return "Summary of " + prompt[:10] + "..."
 
-            async def generate_project_overview(self, file_manifest: Dict[str, Any]) -> str:
+            async def generate_project_overview(
+                self, file_manifest: Dict[str, Any]
+            ) -> str:
                 return "Project overview"
 
             async def generate_usage_guide(self, file_manifest: Dict[str, Any]) -> str:
                 return "Usage guide"
 
-            async def generate_contributing_guide(self, file_manifest: Dict[str, Any]) -> str:
+            async def generate_contributing_guide(
+                self, file_manifest: Dict[str, Any]
+            ) -> str:
                 return "Contributing guide"
 
             async def generate_license_info(self, file_manifest: Dict[str, Any]) -> str:
                 return "License info"
 
-            async def generate_architecture_content(self, file_manifest: Dict[str, Any], analyzer: Any) -> str:
+            async def generate_architecture_content(
+                self, file_manifest: Dict[str, Any], analyzer: Any
+            ) -> str:
                 return "Architecture content"
 
-            async def generate_installation_guide(self, file_manifest: Dict[str, Any]) -> str:
+            async def generate_installation_guide(
+                self, file_manifest: Dict[str, Any]
+            ) -> str:
                 return ""
 
-            async def generate_troubleshooting_guide(self, file_manifest: Dict[str, Any]) -> str:
+            async def generate_troubleshooting_guide(
+                self, file_manifest: Dict[str, Any]
+            ) -> str:
                 return ""
 
-            async def generate_persistence_doc(self, file_manifest: Dict[str, Any], persistence_info: Any) -> str:
+            async def generate_persistence_doc(
+                self, file_manifest: Dict[str, Any], persistence_info: Any
+            ) -> str:
                 return ""
 
-            async def analyze_migration_contents(self, migration_contents: List[Dict[str, Any]]) -> Dict[str, Any]:
-                return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+            async def analyze_migration_contents(
+                self, migration_contents: List[Dict[str, Any]]
+            ) -> Dict[str, Any]:
+                return {
+                    "tables": [],
+                    "indexes": [],
+                    "views": [],
+                    "relationships": [],
+                    "procedures": [],
+                    "triggers": [],
+                }
 
-            async def analyze_single_migration(self, migration_info: Dict[str, Any]) -> Dict[str, Any]:
-                return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+            async def analyze_single_migration(
+                self, migration_info: Dict[str, Any]
+            ) -> Dict[str, Any]:
+                return {
+                    "tables": [],
+                    "indexes": [],
+                    "views": [],
+                    "relationships": [],
+                    "procedures": [],
+                    "triggers": [],
+                }
 
-            async def aggregate_migration_analyses(self, individual_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
-                return {"tables": [], "indexes": [], "views": [], "relationships": [], "procedures": [], "triggers": []}
+            async def aggregate_migration_analyses(
+                self, individual_analyses: List[Dict[str, Any]]
+            ) -> Dict[str, Any]:
+                return {
+                    "tables": [],
+                    "indexes": [],
+                    "views": [],
+                    "relationships": [],
+                    "procedures": [],
+                    "triggers": [],
+                }
 
-            async def generate_structured_json_response(self, messages: List[Dict[str, str]], max_tokens: Optional[int] = None) -> str:
+            async def generate_structured_json_response(
+                self, messages: List[Dict[str, str]], max_tokens: Optional[int] = None
+            ) -> str:
                 return ""
 
-            async def generate_component_relationships(self, file_manifest: Dict[str, Any]) -> str:
+            async def generate_component_relationships(
+                self, file_manifest: Dict[str, Any]
+            ) -> str:
                 return "Component relationships"
 
-            async def enhance_documentation(self, existing_content: str, file_manifest: Dict[str, Any], doc_type: str) -> str:
+            async def enhance_documentation(
+                self,
+                existing_content: str,
+                file_manifest: Dict[str, Any],
+                doc_type: str,
+            ) -> str:
                 return f"Enhanced {doc_type}: {existing_content[:10]}..."
 
             def set_project_structure(self, structure: str) -> None:
@@ -89,7 +138,7 @@ class TestBaseLLMClient(unittest.TestCase):
         """Test the validate_input method."""
         # Valid input
         self.assertTrue(self.client.validate_input("Hello world"))
-        
+
         # Invalid inputs
         self.assertFalse(self.client.validate_input(""))
         self.assertFalse(self.client.validate_input(None))
@@ -99,7 +148,7 @@ class TestBaseLLMClient(unittest.TestCase):
         """Test the validate_file_manifest method."""
         # Valid manifest
         self.assertTrue(self.client.validate_file_manifest({"file.py": {}}))
-        
+
         # Invalid manifests
         self.assertFalse(self.client.validate_file_manifest(None))
         self.assertFalse(self.client.validate_file_manifest("not a dict"))
@@ -112,5 +161,5 @@ class TestBaseLLMClient(unittest.TestCase):
         self.assertEqual(self.client.project_structure, structure)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

@@ -8,15 +8,16 @@ should_cache_component() returns a bool, and get_performance_metrics()
 returns a dict.
 """
 
-import sys
 import os
+import sys
+
 import pytest
 
 # Ensure project root is on the path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.utils.prompt_cache_manager import PromptCacheManager, CacheableComponent
-from src.utils.config_class import ScribeConfig, BedrockConfig
+from src.utils.config_class import BedrockConfig, ScribeConfig
+from src.utils.prompt_cache_manager import CacheableComponent, PromptCacheManager
 
 
 @pytest.fixture
@@ -24,11 +25,11 @@ def scribe_config():
     """Provide a ScribeConfig with Bedrock prompt caching settings."""
     config = ScribeConfig()
     config.bedrock = BedrockConfig(
-        region='us-east-1',
-        model_id='us.anthropic.claude-sonnet-4-20250514-v1:0',
+        region="us-east-1",
+        model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
         enable_prompt_caching=True,
         cache_min_tokens=1024,
-        cache_strategy='balanced',
+        cache_strategy="balanced",
     )
     return config
 
@@ -38,11 +39,11 @@ def disabled_cache_config():
     """Provide a ScribeConfig with prompt caching disabled."""
     config = ScribeConfig()
     config.bedrock = BedrockConfig(
-        region='us-east-1',
-        model_id='us.anthropic.claude-sonnet-4-20250514-v1:0',
+        region="us-east-1",
+        model_id="us.anthropic.claude-sonnet-4-20250514-v1:0",
         enable_prompt_caching=False,
         cache_min_tokens=1024,
-        cache_strategy='balanced',
+        cache_strategy="balanced",
     )
     return config
 
@@ -68,7 +69,7 @@ class TestPromptCacheManagerInstantiation:
     def test_strategy_read_from_config(self, scribe_config):
         """Test that the cache strategy is read from the config."""
         manager = PromptCacheManager(scribe_config)
-        assert manager.strategy == 'balanced'
+        assert manager.strategy == "balanced"
 
     def test_min_cache_tokens_read_from_config(self, scribe_config):
         """Test that min_cache_tokens is read from the config."""
@@ -130,37 +131,39 @@ class TestGetPerformanceMetrics:
         manager = PromptCacheManager(scribe_config)
         metrics = manager.get_performance_metrics()
 
-        assert 'prompt_cache_enabled' in metrics
-        assert 'prompt_cache_strategy' in metrics
-        assert 'prompt_cache_hit_rate' in metrics
-        assert 'total_prompt_cached_requests' in metrics
-        assert 'total_requests' in metrics
-        assert 'average_generation_time' in metrics
+        assert "prompt_cache_enabled" in metrics
+        assert "prompt_cache_strategy" in metrics
+        assert "prompt_cache_hit_rate" in metrics
+        assert "total_prompt_cached_requests" in metrics
+        assert "total_requests" in metrics
+        assert "average_generation_time" in metrics
 
     def test_cache_enabled_flag_in_metrics(self, scribe_config, disabled_cache_config):
         """Test that the metrics reflect whether caching is enabled."""
         enabled_manager = PromptCacheManager(scribe_config)
         disabled_manager = PromptCacheManager(disabled_cache_config)
 
-        assert enabled_manager.get_performance_metrics()['prompt_cache_enabled'] is True
-        assert disabled_manager.get_performance_metrics()['prompt_cache_enabled'] is False
+        assert enabled_manager.get_performance_metrics()["prompt_cache_enabled"] is True
+        assert (
+            disabled_manager.get_performance_metrics()["prompt_cache_enabled"] is False
+        )
 
     def test_metrics_after_response_update(self, scribe_config):
         """Test that update_metrics_from_response() is reflected in performance metrics."""
         manager = PromptCacheManager(scribe_config)
         manager.update_metrics_from_response(
             usage_data={
-                'input_tokens': 1000,
-                'output_tokens': 200,
-                'cache_read_input_tokens': 800,
-                'cache_creation_input_tokens': 0,
+                "input_tokens": 1000,
+                "output_tokens": 200,
+                "cache_read_input_tokens": 800,
+                "cache_creation_input_tokens": 0,
             },
             generation_time=1.5,
         )
 
         metrics = manager.get_performance_metrics()
-        assert metrics['total_input_tokens'] == 1000
-        assert metrics['total_output_tokens'] == 200
+        assert metrics["total_input_tokens"] == 1000
+        assert metrics["total_output_tokens"] == 200
 
 
 class TestEstimateTokens:

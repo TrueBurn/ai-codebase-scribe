@@ -11,7 +11,7 @@ import time
 import traceback
 import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 # Third-party imports
 import urllib3
@@ -22,58 +22,58 @@ os.environ["MAGIC_REGEX_MEMORY"] = os.environ.get("MAGIC_REGEX_MEMORY", "1000000
 
 # Local imports
 from src.analyzers.codebase import CodebaseAnalyzer
+from src.analyzers.persistence import has_meaningful_persistence_content
 from src.clients.base_llm import BaseLLMClient
 from src.clients.llm_factory import LLMClientFactory
 from src.generators.architecture import generate_architecture
 from src.generators.contributing import generate_contributing
-from src.generators.persistence import generate_persistence, analyze_persistence_layer
-from src.analyzers.persistence import has_meaningful_persistence_content
-from src.generators.readme import generate_readme
 from src.generators.installation import generate_installation
-from src.generators.usage import generate_usage
+from src.generators.persistence import analyze_persistence_layer, generate_persistence
+from src.generators.readme import generate_readme
 from src.generators.troubleshooting import generate_troubleshooting
-from src.utils.readme_refactor import (
-    refactor_readme_for_split_docs,
-    add_navigation_section_to_readme,
-)
+from src.generators.usage import generate_usage
 from src.models.file_info import FileInfo
 from src.utils.badges import generate_badges
 from src.utils.cache import CacheManager
 from src.utils.cache_utils import display_cache_stats, display_github_cache_stats
-from src.utils.config_utils import load_config, update_config_with_args
 from src.utils.config_class import ScribeConfig
+from src.utils.config_utils import load_config, update_config_with_args
 from src.utils.doc_utils import (
     add_ai_attribution,
-    insert_badges_after_title,
     detect_existing_badges,
+    insert_badges_after_title,
 )
 from src.utils.exceptions import (
-    ScribeError,
     ConfigurationError,
-    RepositoryError,
     FileProcessingError,
-    LLMError,
     GitHubError,
+    LLMError,
+    RepositoryError,
+    ScribeError,
 )
 from src.utils.github_utils import (
-    is_valid_github_url,
     clone_github_repository,
-    create_git_branch,
-    commit_documentation_changes,
-    push_branch_to_remote,
-    create_pull_request,
-    extract_repo_info,
-    prepare_github_branch,
-    find_existing_pr,
     close_pull_request,
+    commit_documentation_changes,
+    create_git_branch,
+    create_pull_request,
     delete_branch,
+    extract_repo_info,
+    find_existing_pr,
+    is_valid_github_url,
+    prepare_github_branch,
+    push_branch_to_remote,
 )
 from src.utils.progress_utils import (
+    create_documentation_progress_bar,
     create_file_processing_progress_bar,
     create_optimization_progress_bar,
-    create_documentation_progress_bar,
 )
-from src.utils.visual_logger import setup_visual_logging, get_visual_logger
+from src.utils.readme_refactor import (
+    add_navigation_section_to_readme,
+    refactor_readme_for_split_docs,
+)
+from src.utils.visual_logger import get_visual_logger, setup_visual_logging
 
 # Load environment variables from .env file
 load_dotenv()
@@ -1434,7 +1434,6 @@ async def main():
                 llm_client.set_project_structure_from_manifest(manifest)
 
         # No related repos in open-source version
-        related_repo_data = None
 
         # Process files
         file_manifest = await process_files(repo_path, llm_client, config)
@@ -1477,9 +1476,7 @@ async def main():
                     # Calculate processing statistics
                     processed_count = len(file_manifest)
                     total_count = len(all_files)
-                    elapsed_time = (
-                        config.large_repo.time_limit_minutes * 60
-                    )
+                    elapsed_time = config.large_repo.time_limit_minutes * 60
 
                     try:
                         pr_url = await create_batch_processing_pr(
@@ -1558,7 +1555,7 @@ async def main():
         if hasattr(config, "persistence") and config.persistence.enabled:
             vlogger.section("Persistence Layer Analysis")
             vlogger.info("Analyzing persistence layer...", emoji="persistence")
-            with create_documentation_progress_bar(repo_path) as progress:
+            with create_documentation_progress_bar(repo_path) as _:
                 persistence_info = await analyze_persistence_layer(
                     repo_path=repo_path, config=config, llm_client=llm_client
                 )
@@ -1581,7 +1578,7 @@ async def main():
             # Track timing
             persist_start_time = time.time()
 
-            with create_documentation_progress_bar(repo_path) as progress:
+            with create_documentation_progress_bar(repo_path) as _:
                 persistence_content = await generate_persistence(
                     repo_path=repo_path,
                     file_manifest=file_manifest,
@@ -1616,7 +1613,7 @@ async def main():
         arch_start_time = time.time()
 
         try:
-            with create_documentation_progress_bar(repo_path) as progress:
+            with create_documentation_progress_bar(repo_path) as _:
                 architecture_content = await generate_architecture(
                     repo_path=repo_path,
                     file_manifest=file_manifest,
@@ -1767,7 +1764,7 @@ async def main():
 
             try:
                 # Generate all four docs concurrently
-                with create_documentation_progress_bar(repo_path) as progress:
+                with create_documentation_progress_bar(repo_path) as _:
                     results = await asyncio.gather(
                         _generate_installation_with_timing(),
                         _generate_usage_with_timing(),
@@ -1945,7 +1942,7 @@ async def main():
         # Track timing
         readme_start_time = time.time()
 
-        with create_documentation_progress_bar(repo_path) as progress:
+        with create_documentation_progress_bar(repo_path) as _:
             try:
                 readme_content = await generate_readme(
                     repo_path=repo_path,
@@ -2083,9 +2080,7 @@ async def main():
         # Write files
         readme_path = repo_path / args.output
         architecture_path = repo_path / "docs" / "ARCHITECTURE.md"
-        contributing_path = (
-            repo_path / "CONTRIBUTING.md"
-        )
+        contributing_path = repo_path / "CONTRIBUTING.md"
 
         # Set up persistence documentation path
         persistence_path = None
@@ -2306,7 +2301,9 @@ async def main():
                 if isinstance(metrics, dict) and metrics.get("prompt_cache_enabled"):
                     vlogger.prompt_cache_metrics(metrics)
                 elif isinstance(metrics, dict):
-                    vlogger.info("Prompt caching was disabled for this run", emoji="info")
+                    vlogger.info(
+                        "Prompt caching was disabled for this run", emoji="info"
+                    )
             except (TypeError, AttributeError):
                 pass
 
